@@ -2,9 +2,9 @@
 # Minimal compile script for fully coupled model CM2M experiments
 
 set echo
-set platform      = gfortran   # A unique identifier for your platfo
+set platform      = raijin.nci.org.au   # A unique identifier for your platfo
                                   # This corresponds to the mkmf templates in $root/bin dir.
-set type          = MOM_solo      # Type of the experiment
+set type          = MOM_SIS      # Type of the experiment
 set help = 0
 
 set argv = (`getopt -u -o h -l type: -l platform:  -l help  --  $*`)
@@ -38,6 +38,7 @@ if ( $help ) then
     exit 0
 endif
 
+
 #
 # User does not need to change anything below!
 #
@@ -61,17 +62,16 @@ if ( $type == EBM ) then
   set cppDefs  = ( "-Duse_netCDF -Duse_netCDF3 -Duse_libMPI -DLAND_BND_TRACERS -DOVERLOAD_C8 -DOVERLOAD_C4 -DOVERLOAD_R4" )
 endif
 
-#
-# Users must ensure the correct environment file exists for their platform.
-#
-source $root/bin/environs.$platform  # environment variables and loadable modules
+##
+## Users must ensure the correct environment file exists for their platform.
+##
+#source $root/bin/environs.$platform  # environment variables and loadable modules
 
-
-#
-# compile mppnccombine.c, needed only if $npes > 1
-  if ( ! -f $mppnccombine ) then
-    cc -O -o $mppnccombine -I/usr/local/include -L/usr/local/lib $code_dir/postprocessing/mppnccombine/mppnccombine.c -lnetcdf
-  endif
+##
+## compile mppnccombine.c, needed only if $npes > 1
+#  if ( ! -f $mppnccombine ) then
+#    cc -O -o $mppnccombine -I/usr/local/include -L/usr/local/lib $code_dir/postprocessing/mppnccombine/mppnccombine.c -lnetcdf
+#  endif
 
 set mkmf_lib = "$mkmf -f -m Makefile -a $code_dir -t $mkmfTemplate"
 set lib_include_dirs = "$root/include $code_dir/shared/include $code_dir/shared/mpp/include"
@@ -157,6 +157,8 @@ else if( $type == ICCM ) then
     set libs = "$executable:h:h/lib_ocean/lib_ocean.a $executable:h:h/lib_ice/lib_ice.a $executable:h:h/lib_atmos_bg/lib_atmos_bg.a $executable:h:h/lib_atmos_phys/lib_atmos_phys.a $executable:h:h/lib_land_lad/lib_land_lad.a $executable:h:h/lib_FMS/lib_FMS.a"
 endif
 $mkmf_exec -o "$includes" -l "$libs"  $srcList
+
+
 make
 if( $status ) then
     echo "Make failed to create the $type executable"
