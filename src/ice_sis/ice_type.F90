@@ -53,7 +53,7 @@ public  :: id_mi, id_sh, id_lh, id_sw, id_lw, id_snofl, id_rain, id_runoff,    &
            id_qfres, id_qflim, id_ix_trans, id_iy_trans,                       &
            id_sw_vis, id_sw_dir, id_sw_dif, id_sw_vis_dir, id_sw_vis_dif,      &
            id_sw_nir_dir, id_sw_nir_dif, id_mib, id_ustar, id_vstar, id_vocean,&
-           id_uocean, id_vchan, id_uchan
+           id_uocean, id_vchan, id_uchan, id_aice, id_wnd
 
 public  :: id_alb_vis_dir, id_alb_vis_dif,id_alb_nir_dir, id_alb_nir_dif
 
@@ -75,6 +75,7 @@ public  :: iceClocka,iceClockb,iceClockc
   integer :: id_sw_nir_dir, id_sw_nir_dif, id_mib, id_ustar, id_vstar
   integer :: id_vocean, id_uocean, id_vchan, id_uchan
   integer :: id_alb_vis_dir, id_alb_vis_dif, id_alb_nir_dir, id_alb_nir_dif 
+  integer :: id_aice, id_wnd
 
   !--- namelist interface --------------
   real    :: mom_rough_ice  = 1.0e-4     ! momentum same, cd10=(von_k/ln(10/z0))^2
@@ -177,6 +178,8 @@ public  :: iceClocka,iceClockb,iceClockc
      logical, pointer, dimension(:,:,:) :: ice_mask            =>NULL() ! where ice actually is
      real,    pointer, dimension(:,:,:) :: part_size           =>NULL()
      real,    pointer, dimension(:,:,:) :: part_size_uv        =>NULL()
+     real,    pointer, dimension(:,:)   :: aice                =>NULL()
+     real,    pointer, dimension(:,:,:) :: wnd                 =>NULL()
      real,    pointer, dimension(:,:,:) :: albedo              =>NULL()
      real,    pointer, dimension(:,:,:) :: albedo_vis_dir      =>NULL()
      real,    pointer, dimension(:,:,:) :: albedo_nir_dir      =>NULL()
@@ -400,6 +403,8 @@ public  :: iceClocka,iceClockb,iceClockc
          Ice % sea_lev        (isd:ied, jsd:jed)       , &
          Ice % part_size      (isd:ied, jsd:jed, km)   , &
          Ice % part_size_uv   (isc:iec, jsc:jec, km)   , &
+         Ice % aice           (isc:iec, jsc:jec)       , &
+         Ice % wnd            (isc:iec, jsc:jec, km)   , &
          Ice % u_surf         (isc:iec, jsc:jec, km)   , &
          Ice % v_surf         (isc:iec, jsc:jec, km)   , &
          Ice % u_ocn          (isd:ied, jsd:jed)       , &
@@ -469,6 +474,8 @@ public  :: iceClocka,iceClockb,iceClockc
     Ice % flux_v_top      =0.
     Ice % sea_lev         =0.
     Ice % part_size       =0.
+    Ice % aice            =0.
+    Ice % wnd             =0.
     Ice % u_ocn           =0.
     Ice % v_ocn           =0.
     Ice % u_ice           =0.
@@ -654,6 +661,14 @@ public  :: iceClocka,iceClockb,iceClockc
        Ice%part_size_uv (:,:,1) = Ice%part_size_uv(:,:,1)-Ice%part_size_uv (:,:,k)
     end do
 
+    ! Calculate the total ice cover as single variable to pass to
+    ! ice_ocean_boundary for initial time step, mac, sep12.
+    do j = jsc, jec
+       do i = isc, iec
+          Ice%aice(i,j) = 1.0 - Ice%part_size(i,j,1)
+       enddo
+    enddo
+
     call ice_diagnostics_init(Ice)
     !Balaji
     iceClock = mpp_clock_id( 'Ice', flags=clock_flag_default, grain=CLOCK_COMPONENT )
@@ -716,6 +731,7 @@ public  :: iceClocka,iceClockb,iceClockc
     deallocate(Ice % mask, Ice % ice_mask, Ice % t_surf, Ice % s_surf, Ice % sea_lev )
     deallocate(Ice % vmask)
     deallocate(Ice % part_size, Ice % part_size_uv, Ice % u_surf, Ice % v_surf )
+    deallocate(Ice % aice, Ice % wnd )
     deallocate(Ice % u_ocn, Ice % v_ocn ,  Ice % rough_mom, Ice % rough_heat )
     deallocate(Ice % rough_moist, Ice % albedo, Ice % flux_u_top, Ice % flux_v_top )
     deallocate(Ice % flux_t_top, Ice % flux_q_top, Ice % flux_lw_top )
@@ -806,6 +822,10 @@ public  :: iceClocka,iceClockb,iceClockc
        id_ext = register_diag_field('ice_model', 'EXT', axt, Ice%Time, &
                 'ice modeled', '0 or 1', missing_value=missing)
     end if
+    id_aice     = register_diag_field('ice_model', 'aice', axt, Ice%Time,   &
+                   'ice cover', 'm^2/m^2', missing_value=missing)
+    id_wnd      = register_diag_field('ice_model', 'wnd ', axt, Ice%Time,   &
+                   'wind speed', 'm/s', missing_value=missing)
     id_mi       = register_diag_field('ice_model', 'MI', axt, Ice%Time,                  &
                  'ice mass', 'kg/m^2', missing_value=missing)
     id_mib      = register_diag_field('ice_model', 'MIB', axt, Ice%Time,                  &

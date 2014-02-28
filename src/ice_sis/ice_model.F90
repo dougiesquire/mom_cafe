@@ -53,7 +53,7 @@ module ice_model_mod
                               id_fay, id_fix, id_fiy, id_fcx, id_fcy, id_fwx,    &
                               id_fwy, id_sn2ic,  id_ext, id_slp, id_sst, id_sss, &
                               id_ssh, id_uo, id_vo, id_e2m, id_qflim, id_qfres,  &
-                              id_ix_trans, id_iy_trans,                          &
+                              id_ix_trans, id_iy_trans, id_aice, id_wnd,         &
                               do_ice_restore, do_ice_limit, max_ice_limit,       &
                               ice_restore_timescale, do_init, h2o, heat,         &
                               conservation_check, slp2ocean, iceClock, verbose,  &
@@ -1416,6 +1416,14 @@ contains
        call t_to_uv(Ice%part_size(:,:,k),Ice%part_size_uv(:,:,k))
        Ice%part_size_uv(:,:,1) = Ice%part_size_uv(:,:,1) - Ice%part_size_uv(:,:,k)
     end do
+
+    ! Calculate the total ice cover as single variable to pass to ice_ocean_boundary, mac, aug12.
+    do j = jsc, jec
+       do i = isc, iec
+          Ice%aice(i,j) = 1.0 - Ice%part_size(i,j,1)
+       enddo
+    enddo
+
     call mpp_clock_end(iceClock8)
     !
     ! Thermodynamics diagnostics
@@ -1428,6 +1436,8 @@ contains
          !                                       mask=Ice%mask       )
 
     if (id_ext>0) sent = send_data(id_ext, ext(Ice%part_size(isc:iec,jsc:jec,1)), Ice%Time, mask=Ice%mask)
+    if (id_aice>0) sent = send_data(id_aice, 1.0 - Ice%part_size(isc:iec,jsc:jec,1), Ice%Time, mask=Ice%mask)
+    if (id_wnd>0) sent = send_data(id_wnd, Ice%wnd(isc:iec,jsc:jec,1), Ice%Time, mask=Ice%mask)
     if (id_hs>0) sent  = send_data(id_hs, ice_avg(Ice%h_snow(isc:iec,jsc:jec,:),Ice%part_size(isc:iec,jsc:jec,:)), &
                          Ice%Time, mask=Ice%mask)
     if (id_hi>0) sent  = send_data(id_hi, ice_avg(Ice%h_ice(isc:iec,jsc:jec,:) ,Ice%part_size(isc:iec,jsc:jec,:)), &

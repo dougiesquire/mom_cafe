@@ -359,6 +359,8 @@ private
   real, dimension(isd:ied,jsd:jed)      :: patm          ! pressure at ocean top from atmosphere and/or ice (Pa) 
   real, dimension(isd:ied,jsd:jed)      :: swflx         ! short wave radiation flux (W/m^2)
   real, dimension(isd:ied,jsd:jed)      :: swflx_vis     ! visible short wave radiation flux (W/m^2)
+  real, dimension(isd:ied,jsd:jed)      :: aice          ! area fraction covered with sea ice (m^2/m^2)
+  real, dimension(isd:ied,jsd:jed)      :: wnd           ! wind speed (m/s)
   real, dimension(isd:ied,jsd:jed,nk)   :: sw_frac_zt    ! short wave radiation flux fraction
   real, dimension(isd:ied,jsd:jed,nk)   :: opacity       ! attenuation of visible light (1/metre)
   real, dimension(isd:ied,jsd:jed)      :: surf_blthick  ! surf boundary layer depth from vertical mixing scheme (m)
@@ -385,6 +387,8 @@ private
   real, pointer, dimension(:,:)     :: patm                =>NULL() ! pressure at ocean top from sea ice and/or atmosphere (Pa) 
   real, pointer, dimension(:,:)     :: swflx               =>NULL() ! short wave radiation flux (W/m^2) 
   real, pointer, dimension(:,:)     :: swflx_vis           =>NULL() ! short wave radiation flux (W/m^2) 
+  real, pointer, dimension(:,:)     :: aice                =>NULL()   ! area fraction covered with sea ice (m^2/m^2)
+  real, pointer, dimension(:,:)     :: wnd                 =>NULL()   ! wind speed (m/s)
   real, pointer, dimension(:,:,:)   :: sw_frac_zt          =>NULL() ! short wave radiation flux fraction
   real, pointer, dimension(:,:,:)   :: opacity             =>NULL() ! attenuation of visible light (1/metre)
   real, pointer, dimension(:,:)     :: surf_blthick        =>NULL() ! surf boundary layer depth from vertical mixing scheme (m)
@@ -1142,6 +1146,8 @@ subroutine ocean_model_init(Ocean, Ocean_state, Time_init, Time_in)
     allocate(swflx(isd:ied,jsd:jed))    
     allocate(swflx_vis(isd:ied,jsd:jed))    
     allocate(sw_frac_zt(isd:ied,jsd:jed,nk))    
+    allocate(aice(isd:ied,jsd:jed))
+    allocate(wnd(isd:ied,jsd:jed))
     allocate(opacity(isd:ied,jsd:jed,nk))    
     allocate(surf_blthick(isd:ied,jsd:jed))    
     allocate(bott_blthick(isd:ied,jsd:jed))    
@@ -1163,6 +1169,8 @@ subroutine ocean_model_init(Ocean, Ocean_state, Time_init, Time_in)
     patm                        = 0.0
     swflx                       = 0.0    
     swflx_vis                   = 0.0    
+    aice                        = 0.0    
+    wnd                         = 0.0    
     sw_frac_zt                  = 0.0    
     opacity                     = 0.0    
     surf_blthick                = 0.0
@@ -1467,7 +1475,7 @@ subroutine ocean_model_init(Ocean, Ocean_state, Time_init, Time_in)
        call mpp_clock_begin(id_sbc)
        call get_ocean_sbc(Time, Ice_ocean_boundary, Thickness, Dens, Ext_mode,       &
             T_prog(1:num_prog_tracers), Velocity, pme, melt, river, runoff, calving, &
-            upme, uriver, swflx, swflx_vis, patm)
+            upme, uriver, swflx, swflx_vis, patm, aice, wnd)
        call mpp_clock_end(id_sbc)
 
        ! compute "flux adjustments" (e.g., surface tracer restoring, flux correction)
@@ -1511,12 +1519,12 @@ subroutine ocean_model_init(Ocean, Ocean_state, Time_init, Time_in)
        ! compute ocean tendencies from tracer packages
        call mpp_clock_begin(id_otpm_source)
        call ocean_tpm_source(isd, ied, jsd, jed, Domain, Grid, T_prog(:), T_diag(:), &
-            Time, Thickness, Dens, surf_blthick, dtts)
+            Time, Thickness, Dens, surf_blthick, dtts, swflx, sw_frac_zt)
        call mpp_clock_end(id_otpm_source)
 
        ! set ocean surface boundary conditions for the tracer packages
        call mpp_clock_begin(id_otpm_bbc)
-       call ocean_tpm_bbc(Domain, Grid, T_prog(:))
+       call ocean_tpm_bbc(Domain, Grid, Time, T_prog(:))
        call mpp_clock_end(id_otpm_bbc)
 
        ! add sponges to T_prog%th_tendency 

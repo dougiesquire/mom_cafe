@@ -1201,6 +1201,8 @@ module ocean_types_mod
      real, pointer, dimension(:,:) :: calving_hflx    =>NULL() ! heat flux, relative to 0C, of frozen land water into ocean (W/m2) 
      real, pointer, dimension(:,:) :: p               =>NULL() ! pressure of overlying sea ice and atmosphere (Pa)
      real, pointer, dimension(:,:) :: mi              =>NULL() ! mass of overlying sea ice 
+     real, pointer, dimension(:,:) :: aice            =>NULL() ! areal fraction of sea ice cover (unitless). mac, aug12
+     real, pointer, dimension(:,:) :: wnd             =>NULL() ! wind speed (m/s). mac, may13.
 
      integer :: xtype                                          ! REGRID, REDIST or DIRECT
 

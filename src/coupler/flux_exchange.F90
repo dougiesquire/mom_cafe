@@ -1037,6 +1037,8 @@ subroutine flux_exchange_init ( Time, Atm, Land, Ice, Ocean, Ocean_state,&
     allocate( ice_ocean_boundary%calving_hflx  (is:ie,js:je) )
     allocate( ice_ocean_boundary%p        (is:ie,js:je) )
     allocate( ice_ocean_boundary%mi       (is:ie,js:je) )
+    allocate( ice_ocean_boundary%aice     (is:ie,js:je) )
+    allocate( ice_ocean_boundary%wnd      (is:ie,js:je) )
 
 !
 ! allocate fields for extra tracers
@@ -1785,6 +1787,10 @@ subroutine sfc_boundary_layer ( dt, Time, Atm, Land, Ice, Land_Ice_Atmos_Boundar
        ex_albedo_nir_dif_fix = 1.
   endif
 #endif
+
+! place the wind value onto the ice data type.  mac, may13.
+  call get_from_xgrid (Ice%wnd, 'OCN', ex_wind, xmap_sfc)
+
 
   !=======================================================================
   ! [7] diagnostics section
@@ -2851,6 +2857,13 @@ subroutine flux_ice_to_ocean ( Time, Ice, Ocean, Ice_Ocean_Boundary )
   if(ASSOCIATED(Ice_Ocean_Boundary%q_flux) ) call flux_ice_to_ocean_redistribute( Ice, Ocean, &
       Ice%flux_q, Ice_Ocean_Boundary%q_flux, Ice_Ocean_Boundary%xtype, do_area_weighted_flux )
 
+  if(ASSOCIATED(Ice_Ocean_Boundary%aice) ) call flux_ice_to_ocean_redistribute( Ice, Ocean, &
+      Ice%aice, Ice_Ocean_Boundary%aice, Ice_Ocean_Boundary%xtype, do_area_weighted_flux )
+
+  if(ASSOCIATED(Ice_Ocean_Boundary%wnd) ) call flux_ice_to_ocean_redistribute( Ice, Ocean, &
+      Ice%wnd(:,:,1), Ice_Ocean_Boundary%wnd, Ice_Ocean_Boundary%xtype, do_area_weighted_flux )
+
+
 !Balaji: moved data_override calls here from coupler_main
   if( ocn_pe )then
       call mpp_set_current_pelist(ocn_pelist)
@@ -2858,6 +2871,8 @@ subroutine flux_ice_to_ocean ( Time, Ice, Ocean, Ice_Ocean_Boundary )
       call data_override('OCN', 'v_flux',    Ice_Ocean_Boundary%v_flux   , Time )
       call data_override('OCN', 't_flux',    Ice_Ocean_Boundary%t_flux   , Time )
       call data_override('OCN', 'q_flux',    Ice_Ocean_Boundary%q_flux   , Time )
+      call data_override('OCN', 'aice',      Ice_Ocean_Boundary%aice   , Time )
+      call data_override('OCN', 'wnd',       Ice_Ocean_Boundary%wnd   , Time )
       call data_override('OCN', 'salt_flux', Ice_Ocean_Boundary%salt_flux, Time )
       call data_override('OCN', 'lw_flux',   Ice_Ocean_Boundary%lw_flux  , Time )
       call data_override('OCN', 'sw_flux_nir_dir',   Ice_Ocean_Boundary%sw_flux_nir_dir  , Time )
