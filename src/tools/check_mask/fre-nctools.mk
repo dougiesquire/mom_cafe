@@ -1,5 +1,5 @@
 #
-# $Id: fre-nctools.mk,v 1.1.2.2 2012/06/06 15:40:15 Zhi.Liang Exp $
+# $Id: fre-nctools.mk,v 20.0 2013/12/14 00:31:35 fms Exp $
 # ------------------------------------------------------------------------------
 # FMS/FRE Project: Makefile to Build Regridding Executables
 # ------------------------------------------------------------------------------
@@ -13,12 +13,16 @@
 # MPICC and CC are defined in env.$(SITE)
 include ./env.$(SITE)
 
-#MPICC    := mpicc
-#CC       := icc
+# HDF5 linking
+# (Not required if HDF5 is statically linked into NetCDF)
+ifdef ($(HDF5_HOME))
+	HDF5_LIBS := -L$(HDF5_HOME)/lib -lhdf5_hl -lhdf5 -lz
+endif
+
 CFLAGS   := -O3 -g -traceback
 CFLAGS_O2:= -O2 -g -traceback
-INCLUDES := -I${NETCDF_HOME}/include -I./ -I../shared -I../../shared/mosaic
-CLIBS     := -L${NETCDF_HOME}/lib -L${HDF5_HOME}/lib -lnetcdf -lhdf5_hl -lhdf5 -lz -limf $(CLIBS2) $(STATIC)
+INCLUDES := -I$(NETCDF_HOME)/include -I./ -I../shared -I../../shared/mosaic
+CLIBS     := -L$(NETCDF_HOME)/lib -lnetcdf $(HDF5_LIBS) -limf $(CLIBS2) $(STATIC)
 
 TARGETS  := check_mask
 

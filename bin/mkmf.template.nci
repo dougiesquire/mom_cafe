@@ -4,24 +4,34 @@
 ############
 # commands #
 ############
-FC = mpif90
-CC = icc
-LD = mpif90
+ifeq ($(VTRACE), yes)
+    FC = mpifort-vt
+    LD = mpifort-vt
+else
+    FC = mpifort
+    LD = mpifort
+endif
+
+CC = mpicc
+
 #########
 # flags #
 #########
-DEBUG =
-REPRO = on
+REPRO =
 VERBOSE =
+OPT = on
 
 MAKEFLAGS += --jobs=4
 
-INCLUDE   = -I$(NETCDF_ROOT)/include
+INCLUDE   = -I$(NETCDF_ROOT)/include \
+			-I$(OASIS_ROOT)/include/psmile.MPI1 \
+			-I$(OASIS_ROOT)/include/pio \
+			-I$(OASIS_ROOT)/include/mct
 
 FPPFLAGS := -fpp -Wp,-w $(INCLUDE)
-FFLAGS := -fno-alias -safe-cray-ptr -ftz -assume byterecl -i4 -r8 -nowarn
-FFLAGS_OPT = -O3 -debug minimal -fp-model precise
-FFLAGS_DEBUG = -g -O0 -check -check noarg_temp_created -check nopointer -warn -warn noerrors -fpe0 -traceback -ftrapuv
+FFLAGS := -fno-alias -safe-cray-ptr -fpe0 -ftz -assume byterecl -i4 -r8 -traceback -nowarn -check noarg_temp_created -assume buffered_io -convert big_endian
+FFLAGS_OPT = -O3 -debug minimal -xHost
+FFLAGS_DEBUG = -g -O0 -debug all -check -check noarg_temp_created -check nopointer -warn -warn noerrors -ftrapuv
 FFLAGS_REPRO = -O2 -debug minimal -no-vec -fp-model precise
 FFLAGS_VERBOSE = -v -V -what
 
@@ -29,13 +39,14 @@ CFLAGS := -D__IFC $(INCLUDE)
 CFLAGS_OPT = -O2 -debug minimal -no-vec
 CFLAGS_DEBUG = -O0 -g -ftrapuv -traceback
 
-LDFLAGS := 
+LDFLAGS :=
 LDFLAGS_VERBOSE := -Wl,-V,--verbose,-cref,-M
 
 ifneq ($(REPRO),)
 CFLAGS += $(CFLAGS_REPRO)
 FFLAGS += $(FFLAGS_REPRO)
 endif
+
 ifneq ($(DEBUG),)
 CFLAGS += $(CFLAGS_DEBUG)
 FFLAGS += $(FFLAGS_DEBUG)
@@ -50,9 +61,9 @@ FFLAGS += $(FFLAGS_VERBOSE)
 LDFLAGS += $(LDFLAGS_VERBOSE)
 endif
 
-LIBS := -L$(NETCDF_ROOT)/lib -lnetcdf -lnetcdff -L$(HDF5_ROOT)/lib -lhdf5_hl -lhdf5 -lcurl -L$(ZLIB_ROOT)/lib -lz
+LIBS := -L$(NETCDF_ROOT)/lib -lnetcdf -lnetcdff \
+		-L$(OASIS_ROOT)/lib -lpsmile.MPI1 -lmct -lmpeu -lscrip \
 
-LIBS += $(OPENMPI_F90LIBS) -lpthread 
 LDFLAGS += $(LIBS)
 
 #---------------------------------------------------------------------------

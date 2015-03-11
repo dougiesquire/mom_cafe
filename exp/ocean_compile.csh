@@ -4,9 +4,17 @@ set srcList = ( mom5/ocean_csiro_bgc mom5/ocean_bgc mom5/ocean_core mom5/ocean_d
 
 set lib_name = "lib_ocean"
 
-mkdir -p $executable:h:h/$lib_name
-cd $executable:h:h/$lib_name
-$mkmf_lib -p $lib_name.a -c "$cppDefs" -o "-I$executable:h:h/lib_FMS" $srcList $lib_include_dirs
+if( $type == ACCESS-OM || $type == ACCESS-CM ) then
+    set srcList = ( $srcList mom5/ocean_access )
+    mkdir -p $executable:h:h/$type/$lib_name
+    cd $executable:h:h/$type/$lib_name
+else
+    set srcList = ( $srcList mom5/ocean_bgc ocean_shared/generic_tracers )
+    mkdir -p $executable:h:h/$lib_name
+    cd $executable:h:h/$lib_name
+endif
+
+$mkmf_lib -p $lib_name.a -c "$cppDefs" -o "$includes" $srcList $lib_include_dirs
 make
 
 if( $status ) then
