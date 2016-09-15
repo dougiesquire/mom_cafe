@@ -21,6 +21,22 @@ LD = mpif90
 LDFLAGS        = -v -L$(NETCDF)/lib/Intel -lnetcdff -L$(NETCDF)/lib/Intel -lnetcdf -lmpi 
 FFLAGS = $(FFLAGS_BASE) $(FFLAGS_REPRO) -O2 -no-vec -nowarn -fpp -save-temps -I$(NETCDF)/include/Intel
 
+# Some higher optimisations that RASF applied to OFAM3....
+# files which probably benefit from inlining:
+#ocean_density.o  ocean_convect.o :FFLAGS +=  $(INLINE_FLAGS)
+ocean_density.o  ocean_convect.o :FFLAGS +=  -O3
+ocean_obc.o :FFLAGS += -O0
+#ocean_bihgen_friction.o : FFLAGS += -O3 -fltconsistency -vec -vec-report3 -opt-report3 -opt-report-file=bhgf.txt   -opt-report-routine=bihgen_friction
+ocean_bihgen_friction.o : FFLAGS += -O3
+#ocean_bihgen_friction.o : FFLAGS += -O3
+
+horiz_interp_type.o horiz_interp_conserve.o horiz_interp_bilinear.o \
+horiz_interp_bicubic.o horiz_interp_spherical.o horiz_interp.o \
+get_cal_time.o time_interp.o axis_utils.o time_interp_external.o \
+ocean_parameters.o ocean_operators.o ocean_util.o ocean_workspace.o ocean_utils.o \
+data_override.o ocean_barotropic.o ocean_sponges_tracer.o ocean_vert_tidal.o \
+ocean_pressure.o tracer_manager.o ocean_tracer_advect.o : FFLAGS += -O3
+
 #---------------------------------------------------------------------------
 # you should never need to change any lines below.
 

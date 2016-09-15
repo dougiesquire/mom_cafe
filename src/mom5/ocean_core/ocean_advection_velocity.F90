@@ -481,7 +481,7 @@ subroutine ocean_advection_velocity_init(Grid, Domain, Time, Time_steps, Thickne
     missing_value=missing_value, range=(/-10.e4,10.e4/))
 
   id_wt = register_diag_field ('ocean_model', 'wt', Grd%vel_axes_wt(1:3), Time%model_time, &
-    'dia-surface velocity T-points', 'm/sec', missing_value=missing_value, range=(/-10.e4,10.e4/))
+    'dia-surface velocity T-points', 'm/sec', missing_value=missing_value, range=(/-0.2,0.2/))
 
   id_wrho_bt = register_diag_field ('ocean_model', 'wrhot', Grd%vel_axes_wt(1:3), Time%model_time, &
     'rho*dia-surface velocity T-points', '(kg/m^3)*m/sec', missing_value=missing_value, range=(/-10.e4,10.e4/))

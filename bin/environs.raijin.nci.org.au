@@ -1,0 +1,15 @@
+   echo $MODULE_VERSION
+   source /opt/Modules/3.2.6/init/csh
+   module purge
+module load dot
+set intel_ver = 14.3.174
+module load intel-fc/$intel_ver
+module load intel-cc/$intel_ver
+module load openmpi/1.8.3
+
+
+   module load netcdf/4.3.2
+
+   # required on xe for mpicc wrapper to fet the correct cc compiler
+   setenv OMPI_CC icc
+   mpicc -showme

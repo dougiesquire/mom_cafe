@@ -1,14 +1,17 @@
 #!/bin/csh -f
 # Minimal compile script for fully coupled model CM2M experiments
 
+
 set echo
 set platform      = raijin.nci.org.au   # A unique identifier for your platfo
                                   # This corresponds to the mkmf templates in $root/bin dir.
 set type          = MOM_SIS      # Type of the experiment
 set help = 0
 set debug = 0
+set unit_testing = 0
 
-set argv = (`getopt -u -o h -l type: -l platform: -l help: -l unit_testing -l debug  --  $*`)
+
+set argv = (`getopt -u -o h -l type: -l platform: -l help  --  $*`)
 while ("$argv[1]" != "--")
     switch ($argv[1])
         case --type:
@@ -84,7 +87,7 @@ endif
 ##
 ## Users must ensure the correct environment file exists for their platform.
 ##
-#source $root/bin/environs.$platform  # environment variables and loadable modules
+source $root/bin/environs.$platform  # environment variables and loadable modules
 
 ##
 ## compile mppnccombine.c, needed only if $npes > 1
