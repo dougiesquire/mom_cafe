@@ -1,0 +1,10 @@
+# template for the Intel fortran compiler version 8
+# typical use with mkmf
+# mkmf -t template.ifc -c"-Duse_libMPI -Duse_netCDF" path_names /usr/local/include
+FFLAGS =  -B/opt/intel/fc/9.1.030/lib -i-static -Bstatic -safe-cray-ptr  -assume byterecl  -i4 -r8 -w95 -I/opt/netcdf/include 
+#FFLAGS = -w -Vaxlib -O  -80 -i-static  -convert big_endian -quiet -openmp
+CPPFLAGS =  -I/opt/netcdf/include -I/usr/local/include 
+FC = /opt/openmpi/bin/mpif90
+LD = /opt/openmpi/bin/mpif90
+LDFLAGS = -L/opt/openmpi/lib -L/usr/lib -L/opt/netcdf/lib -L/usr/local/lib -lnetcdf 
+CFLAGS = -D__IFC -m64
