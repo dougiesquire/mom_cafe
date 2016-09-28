@@ -1,5 +1,3 @@
-! $HeadURL: https://access-svn.nci.org.au/svn/mom4/ozMOM/trunk/src/mom4p1/ocean_csiro_bgc/bio_v3.inc $
-! $Id: bio_v3.inc 414 2013-11-07 01:00:26Z mtc599 $
 !
 
 subroutine bio_v3(isc, iec, jsc, jec, isd, ied, jsd, jed, T_prog, Grid, Time, dtts, Thickness, Dens, swflx, sw_frac_zt)
@@ -59,7 +57,7 @@ integer :: index_temp, index_salt
       real :: dtsb
       real :: adv_fb(isc:iec,1:grid%nk+1)
       real, dimension(isd:ied,jsd:jed) :: mld
-      real :: caco3_bgc_tend, no3_bgc_tend
+      real :: caco3_bgc_change, no3_bgc_change
 
 !
 ! =====================================================================
@@ -90,16 +88,6 @@ integer :: index_temp, index_salt
   call time_interp_external(tscav_fe_id, time%model_time, tscav_fe)
   call time_interp_external(fe_bkgnd_id, time%model_time, fe_bkgnd)
   call time_interp_external(f_inorg_id, time%model_time, f_inorg)
-
-
-
-
-
-! set the maximum index for euphotic depth
-      do k=1,grid%nk
-         if (grid%zw(k).le. 400) kmeuph=k
-      enddo
-!        print*,'rjm euphotic ', kmeuph
 
 
 
@@ -350,7 +338,7 @@ do n = 1, instances  !{
 ! rjm -- extra equation for caco3 - alkalinity
         if (id_caco3.ne.0) &
          biotr(i,k,id_caco3) = biotr(i,k,id_caco3)  + dtsb * ( (   &
-               (1-gam1bio(i,j))*f21 + f23 + f32)*f_inorg(i,j)*106/16 - f51)  ! 8% of POC 106/16*.08 * correction factor.   
+               (1-gam1bio(i,j))*f21 + f23 + f32)*f_inorg(i,j)*106/16 - f51)  ! 8% of POC 106/16*.08   
  
 ! rjm -- extra equation for iron
 !        if (id_fe.ne.0) &
@@ -372,66 +360,36 @@ do n = 1, instances  !{
         do k = 1, grid%nk  !{
          do i = isc, iec  !{
 
-        no3_bgc_tend = grid%tmask(i,j,k)* &
-            rdtts * Thickness%rho_dzt(i,j,k,time%tau) *            &
-         (biotr(i,k,id_no3) - max(0.0,t_prog(ind_no3)%field(i,j,k,time%taum1)))
-        t_prog(ind_no3)%th_tendency(i,j,k) = &
-            t_prog(ind_no3)%th_tendency(i,j,k) + no3_bgc_tend
-           
-        t_prog(ind_phy)%th_tendency(i,j,k) = &
-            t_prog(ind_phy)%th_tendency(i,j,k) + grid%tmask(i,j,k)* &
-            rdtts *  Thickness%rho_dzt(i,j,k,time%tau) *           &
-           (biotr(i,k,id_phy) - max(0.0,t_prog(ind_phy)%field(i,j,k,time%taum1)))  
-  
-        t_prog(ind_zoo)%th_tendency(i,j,k) = &
-            t_prog(ind_zoo)%th_tendency(i,j,k) + grid%tmask(i,j,k)* &
-            rdtts *  Thickness%rho_dzt(i,j,k,time%tau) *           &
-           (biotr(i,k,id_zoo) - max(0.0,t_prog(ind_zoo)%field(i,j,k,time%taum1)))
-
-        t_prog(ind_det)%th_tendency(i,j,k) = &
-            t_prog(ind_det)%th_tendency(i,j,k) + grid%tmask(i,j,k)* &
-            rdtts *  Thickness%rho_dzt(i,j,k,time%tau) *           &
-           (biotr(i,k,id_det) - max(0.0,t_prog(ind_det)%field(i,j,k,time%taum1)))
-
-        t_prog(ind_o2)%th_tendency(i,j,k) = &
-            t_prog(ind_o2)%th_tendency(i,j,k) + grid%tmask(i,j,k)*  &
-            rdtts *  Thickness%rho_dzt(i,j,k,time%tau) *           &
-            (biotr(i,k,id_o2) - max(0.0,t_prog(ind_o2)%field(i,j,k,time%taum1)))
-
-  ! note, tscav_fe only works to reduce fe to 0.6, i.e., it doesn't increase fe to this value, mac jun10. 
-  !  background value adjusted 0.6 to 0.1, mac, oct13).  
-  ! Add a term to pull negative fe values back up to zero, mac aug13.
-         if (id_fe.ne.0) &
-        t_prog(ind_fe)%th_tendency(i,j,k) = &
-            t_prog(ind_fe)%th_tendency(i,j,k) + &
-            grid%tmask(i,j,k) * Thickness%rho_dzt(i,j,k,time%tau) * &
-               ( rdtts * (biotr(i,k,id_fe) - max(0.0,t_prog(ind_fe)%field(i,j,k,time%taum1))) &
-               - tscav_fe(i,j) * max(0.0,(t_prog(ind_fe)%field(i,j,k,time%taum1)- fe_bkgnd(i,j)) ) &
-               + 1.0 / 86400.0 *( max(0.0,(0.0 - t_prog(ind_fe)%field(i,j,k,time%taum1)))))
-
-         if (id_caco3.ne.0) & 
-        caco3_bgc_tend = grid%tmask(i,j,k)* &
-            rdtts *  Thickness%rho_dzt(i,j,k,time%tau) *           &
+        no3_bgc_change = grid%tmask(i,j,k)* &
+            (biotr(i,k,id_no3) - max(0.0,t_prog(ind_no3)%field(i,j,k,time%taum1)))
+        caco3_bgc_change = grid%tmask(i,j,k)* &
            (biotr(i,k,id_caco3) - max(0.0,t_prog(ind_caco3)%field(i,j,k,time%taum1)))
-        t_prog(ind_caco3)%th_tendency(i,j,k) = &
-            t_prog(ind_caco3)%th_tendency(i,j,k) + caco3_bgc_tend
 
-! time tendencies of carbon tracers bootstrapped from no3 and caco3 tendencies
-! only use the bgc component of the these tendencies.  mac, mar13.  
-         if (id_dic.ne.0) &
-        t_prog(ind_dic)%th_tendency(i,j,k) = &
-          t_prog(ind_dic)%th_tendency(i,j,k) + &
-          106./16. * no3_bgc_tend - caco3_bgc_tend
+        t_prog(ind_no3)%field(i,j,k,time%taum1) = biotr(i,k,id_no3)
+        t_prog(ind_phy)%field(i,j,k,time%taum1) = biotr(i,k,id_phy)
+        t_prog(ind_zoo)%field(i,j,k,time%taum1) = biotr(i,k,id_zoo)
+        t_prog(ind_det)%field(i,j,k,time%taum1) = biotr(i,k,id_det)
+	t_prog(ind_o2)%field(i,j,k,time%taum1) = biotr(i,k,id_o2)
+        if ( id_caco3 .ne. 0 ) &
+          t_prog(ind_caco3)%field(i,j,k,time%taum1) = biotr(i,k,id_caco3)
+        if ( id_fe .ne. 0 ) &
+          t_prog(ind_fe)%field(i,j,k,time%taum1) = biotr(i,k,id_fe) - &
+           dtts * tscav_fe(i,j) * max(0.0,(biotr(i,k,id_fe) - fe_bkgnd(i,j)) ) 
 
-         if (id_adic.ne.0) &
-        t_prog(ind_adic)%th_tendency(i,j,k) = &
-          t_prog(ind_adic)%th_tendency(i,j,k) + &
-          106./16. * no3_bgc_tend - caco3_bgc_tend 
+        if (id_dic.ne.0) &
+          t_prog(ind_dic)%field(i,j,k,time%taum1) = &
+           t_prog(ind_dic)%field(i,j,k,time%taum1) + &
+           106./16. * no3_bgc_change - caco3_bgc_change
 
-         if (id_alk.ne.0) &
-        t_prog(ind_alk)%th_tendency(i,j,k) =  &
-           t_prog(ind_alk)%th_tendency(i,j,k) +  &  
-           ( - 2.0 * caco3_bgc_tend - no3_bgc_tend)
+        if (id_adic.ne.0) &
+          t_prog(ind_adic)%field(i,j,k,time%taum1) = &
+           t_prog(ind_adic)%field(i,j,k,time%taum1) + &
+           106./16. * no3_bgc_change - caco3_bgc_change 
+
+        if (id_alk.ne.0) &
+          t_prog(ind_alk)%field(i,j,k,time%taum1) =  &
+           t_prog(ind_alk)%field(i,j,k,time%taum1) +  &  
+           ( - 2.0 * caco3_bgc_change - no3_bgc_change)
 
         pprod_gross(i,j,k)=rdtts*pprod_gross(i,j,k)*grid%tmask(i,j,k)
         zprod_gross(i,j,k)=rdtts*zprod_gross(i,j,k)*grid%tmask(i,j,k)
@@ -509,9 +467,9 @@ do n = 1, instances  !{
 
      do k =1,grid%nk  !{
       do i =isc,iec  !{
-        t_prog(ind_det)%th_tendency(i,j,k) = t_prog(ind_det)%th_tendency(i,j,k) + &
-            grid%tmask(i,j,k)  * Thickness%rho_dzt(i,j,k,time%tau)  &
-                      *(-adv_fb(i,k+1) + adv_fb(i,k))/Thickness%dzt(i,j,k)
+        t_prog(ind_det)%field(i,j,k,time%taum1) = t_prog(ind_det)%field(i,j,k,time%taum1) + &
+            grid%tmask(i,j,k) * dtts * &
+            (-adv_fb(i,k+1) + adv_fb(i,k))/Thickness%dzt(i,j,k)
       enddo  !} i
      enddo  !} k
 
@@ -569,9 +527,9 @@ if (id_caco3.ne.0) then
 
      do k =1,grid%nk  !{
       do i =isc,iec  !{
-        t_prog(ind_caco3)%th_tendency(i,j,k)=t_prog(ind_caco3)%th_tendency(i,j,k) +&
-            grid%tmask(i,j,k) * Thickness%rho_dzt(i,j,k,time%tau)  &
-                      *(-adv_fb(i,k+1) + adv_fb(i,k))/Thickness%dzt(i,j,k)
+        t_prog(ind_caco3)%field(i,j,k,time%taum1)=t_prog(ind_caco3)%field(i,j,k,time%taum1) +&
+            grid%tmask(i,j,k) * dtts * &
+            (-adv_fb(i,k+1) + adv_fb(i,k))/Thickness%dzt(i,j,k)
       enddo  !} i
      enddo  !} k
 endif                   ! end loop for caco3

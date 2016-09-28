@@ -1,5 +1,3 @@
-! $HeadURL: https://access-svn.nci.org.au/svn/mom4/ozMOM/trunk/src/mom4p1/ocean_csiro_bgc/csiro_bgc.F90 $
-! $Id: csiro_bgc.F90 414 2013-11-07 01:00:26Z mtc599 $
 !
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!                                                                   !!
@@ -115,6 +113,10 @@ use ocean_types_mod,    only: ocean_grid_type, ocean_domain_type
 use ocean_types_mod,    only: ocean_prog_tracer_type, ocean_diag_tracer_type
 use ocean_types_mod,    only: ocean_time_type
 
+#ifdef AusCOM
+use ocean_types_mod,    only: ocean_public_type
+#endif
+
 use ocean_tracer_diag_mod,   only: calc_mixed_layer_depth
 
 !----------------------------------------------------------------------
@@ -227,9 +229,10 @@ integer :: ind_po4, ind_dic, ind_alk, ind_o2, ind_no3, ind_phy, ind_det, ind_zoo
 character*6  :: qbio_model
 integer	     :: bio_version    ! version of the bgc module to use
 logical      :: zero_floor     ! apply hard floor to bgc tracers 
-logical      :: sw_thru_ice    ! make this true in a coupled model, so bgc knows swflx is already modified for the presense of ice.
-logical      :: gasx_from_file ! use gasx exchange coefficients from provided files. mac, may13.
-logical      :: ice_file4gasx  ! make this true in a ocean-only model, option to control whether to use ice file or the model ice when determining masking effect of ice on co2 gas exchange.
+logical      :: sw_thru_ice    ! make this true in a coupled model, so bgc knows swflx is already modified for the presense of ice.  
+logical      :: gasx_from_file ! use gasx exchange coefficients from provided files. mac, may13.  
+logical      :: ice_file4gasx  ! make this true in a ocean-only model, option to control whether to use ice file or the model ice when determining masking effect of ice on co2 gas exchange. 
+logical      :: use_access_co2  ! determine whether to use ACCESS atmospheric CO2 or a CO2 file to drive the ocean's anthropogenic CO2 tracer. mac, may13.  
 
 integer  :: id_clock_csiro_obgc
 
@@ -358,6 +361,8 @@ integer                                 :: wdetbio_id
 real, allocatable, dimension(:,:)       :: wdetbio
 integer                                 :: wcaco3_id
 real, allocatable, dimension(:,:)       :: wcaco3
+integer                                 :: nat_co2_id
+real, allocatable, dimension(:,:)       :: nat_co2
 integer                                 :: tscav_fe_id
 real, allocatable, dimension(:,:)       :: tscav_fe
 integer                                 :: fe_bkgnd_id
@@ -538,6 +543,7 @@ allocate( muedbio_sed(isd:ied,jsd:jed) )
 allocate( muecaco3_sed(isd:ied,jsd:jed) )
 allocate( wdetbio(isd:ied,jsd:jed) )
 allocate( wcaco3(isd:ied,jsd:jed) )
+allocate( nat_co2(isd:ied,jsd:jed) )
 allocate( tscav_fe(isd:ied,jsd:jed) )
 allocate( fe_bkgnd(isd:ied,jsd:jed) )
 allocate( f_inorg(isd:ied,jsd:jed) )
@@ -838,8 +844,13 @@ end subroutine  csiro_bgc_end  !}
 ! </DESCRIPTION>
 !
 
+#ifdef AusCOM
+subroutine csiro_bgc_sbc(isc, iec, jsc, jec, isd, ied, jsd, jed, &
+    T_prog, aice, atm_co2, wnd, Ocean_sfc, grid, time, use_waterflux, salt_restore_as_salt_flux)  !{
+#else
 subroutine csiro_bgc_sbc(isc, iec, jsc, jec, isd, ied, jsd, jed, &
     T_prog, aice, wnd, grid, time, use_waterflux, salt_restore_as_salt_flux)  !{
+#endif
 
 use ocmip2_co2calc_mod
 use mpp_mod, only : mpp_sum
@@ -854,12 +865,16 @@ integer, intent(in)                             :: isd, ied
 integer, intent(in)                             :: jsd, jed
 type(ocean_prog_tracer_type), dimension(:), intent(inout)       :: T_prog
 type(ocean_grid_type), intent(in)                               :: Grid
-type(ocean_time_type), intent(in) :: Time
+type(ocean_time_type), intent(in)                               :: Time
 logical, intent(in) :: use_waterflux, salt_restore_as_salt_flux
+#ifdef AusCOM
+type(ocean_public_type), intent(inout)                          :: Ocean_sfc
+real, intent(in), dimension(isd:ied,jsd:jed)                    :: aice, atm_co2, wnd
+#else
 real, intent(in), dimension(isd:ied,jsd:jed)                    :: aice, wnd
+#endif
 real :: total_co2_flux, total_aco2_flux
 logical :: used
-
 
 !-----------------------------------------------------------------------
 !     local definitions
@@ -934,15 +949,27 @@ else
 ! the relations 0.31 * u^2 comes from Wanninkhof 1992, and is the coefficient for steady wind speed; the equation is 0.39 * u^2 for instaneous wind speeds. I don't know what exactly the timescale is between steady and instaneous...
 ! the 3.6e5 is a conversion of units; cm/hr to m/s.
 ! mac, may13.
-   xkw_t(i,j)=(0.31 * wnd(i,j)**2.0 ) /3.6e5
+   xkw_t(i,j)=(0.31 * wnd(i,j)**2.0 ) /3.6e5   
   enddo ! i
  enddo ! j
 endif ! if (gasx_from_file)
 
+call time_interp_external(nat_co2_id, time%model_time, nat_co2)
 call time_interp_external(atmpress_id, time%model_time, patm_t)
 call time_interp_external(dust_id, time%model_time, dust_t)
 if (id_adic .ne. 0) then
+#ifdef AusCOM
+! The atmospheric co2 value for the anthropogenic+natural carbon tracer
+! is either read from a file or a value from the access atmospheric model, 
+! as determined by the flag use_access_co2.  mac, may13.  
+ if (use_access_co2) then 
+  aco2(isc:iec,jsc:jec) = atm_co2(isc:iec,jsc:jec)
+ else
+  call time_interp_external(aco2_id, time%model_time, aco2)
+ endif
+#else
  call time_interp_external(aco2_id, time%model_time, aco2)
+#endif
 endif
 if (ice_file4gasx) then
  call time_interp_external(seaicefract_id, time%model_time, fice_t)
@@ -1006,7 +1033,11 @@ enddo  !} j
 
 !   determine the atmospheric pCO2 concetration for this time-step
 do n = 1, instances  !{
-    biotic(n)%pco2atm(:,:) = 280.
+  do j = jsc, jec
+   do i = isc, iec
+    biotic(n)%pco2atm(i,j) = nat_co2(i,j)
+   enddo
+  enddo
 enddo  !} n
 
 if (id_adic .ne. 0) then
@@ -1038,7 +1069,7 @@ do n = 1, instances  !{
     if (id_no3.ne.0) biotic(n)%po4(:,:) = t_prog(ind_no3)%field(isd:ied,jsd:jed,1,time%taum1)/16.*1e-3
     if (id_po4.ne.0) biotic(n)%po4(:,:) = t_prog(ind_po4)%field(isd:ied,jsd:jed,1,time%taum1)*1e-3
 
-    call ocmip2_co2calc(isd, jsd,                      &
+    call ocmip2_co2calc(isd, jsd, &
        isc, iec, jsc, jec,                     &
        grid%tmask(isd:ied,jsd:jed,1),                           &
        t_prog(indtemp)%field(isd:ied,jsd:jed,1,time%taum1),     &
@@ -1055,7 +1086,7 @@ do n = 1, instances  !{
        scale= 1.0/1024.5 )
 
     if (id_adic .ne. 0) then ! calculate CO2 flux including anthropogenic CO2
-      call ocmip2_co2calc(isd, jsd,                      &
+      call ocmip2_co2calc(isd, jsd,                     &
        isc, iec, jsc, jec,                    &
        grid%tmask(isd:ied,jsd:jed,1),                           &
        t_prog(indtemp)%field(isd:ied,jsd:jed,1,time%taum1),     &
@@ -1179,7 +1210,7 @@ if (id_total_co2_flux .gt. 0) then
 endif
 
 
-total_aco2_flux = 0.0
+total_aco2_flux = 0.0 
 
 if (id_adic.ne.0) then
   do n = 1, instances  !{
@@ -1200,6 +1231,12 @@ if (id_adic.ne.0) then
 
        total_aco2_flux = total_aco2_flux + kw_co2(i,j) *        &
         biotic(n)%csat_acsurf(i,j) * 3.7843e-7 * grid%dat(i,j) * grid%tmask(i,j,1) ! convert from  mol/s to Pg/year (12.0*1e-15*86400*365=3.78e-7)
+! send the anthropogenic Pco2 and co2 flux into the ocean back to the atmospheric model.  mac, may13.  
+#ifdef AusCOM
+       Ocean_sfc%co2flux(i,j) = kw_co2(i,j) *        &
+        biotic(n)%csat_acsurf(i,j)*0.04401 !convert from  mol/m^2/s to kg(CO2)/m^2/s, 0.04401 kg(CO2)/mole
+       Ocean_sfc%co2(i,j) = biotic(n)%paco2surf(i,j) 
+#endif
       enddo  !} i
     enddo  !} j 
   enddo  !} n 
@@ -1346,8 +1383,8 @@ character(len=256), parameter   :: warn_header =                                
      '==>Warning from ' // trim(mod_name) // '(' // trim(sub_name) // '):'
 character(len=256), parameter   :: note_header =                                &
      '==>Note from ' // trim(mod_name) // '(' // trim(sub_name) // '):'
-character(len=128)              :: version = "$Id: csiro_bgc.F90 414 2013-11-07 01:00:26Z mtc599 $"
-character(len=128)              :: tagname = "$HeadURL: https://access-svn.nci.org.au/svn/mom4/ozMOM/trunk/src/mom4p1/ocean_csiro_bgc/csiro_bgc.F90 $"
+character(len=128)              :: version = "git:/mom_mac/src/mom5csiro_bgc.F90"
+character(len=128)              :: tagname = "mac, sep16."
 
 integer                                                 :: n
 character(len=fm_field_name_len)                        :: name
@@ -1458,6 +1495,12 @@ call fm_util_start_namelist(package_name, '*global*', caller = caller_str, no_ov
   call fm_util_set_value('sw_thru_ice', .true.)  ! is shortwave flux modified by an ice model?
   call fm_util_set_value('gasx_from_file', .true.)! use file with gas exchange coefficients?
   call fm_util_set_value('ice_file4gasx', .true.)! use file with ice cover for gas exchange?
+! Set defaults to use the ACCESS atmospheric CO2 for the anthropogenic CO2 in the ocean if this is compiled for AusCOM/ACCESS, otherwise to read CO2 from files provided.  mac, may13.  
+#ifdef AusCOM
+  call fm_util_set_value('use_access_co2', .true.)! use access model co2 values.  mac, may13.  
+#else
+  call fm_util_set_value('use_access_co2', .false.)! use file for atmospheric co2 values.  
+#endif
   call fm_util_set_value('id_po4',0)      
   call fm_util_set_value('id_dic',0)      
   call fm_util_set_value('id_adic',0)      
@@ -1489,6 +1532,7 @@ call fm_util_start_namelist(package_name, '*global*', caller = caller_str, no_ov
   sw_thru_ice = fm_util_get_logical ('sw_thru_ice', scalar = .true.)
   gasx_from_file = fm_util_get_logical ('gasx_from_file', scalar = .true.)
   ice_file4gasx = fm_util_get_logical ('ice_file4gasx', scalar = .true.)
+  use_access_co2 = fm_util_get_logical ('use_access_co2', scalar = .true.)
 
   id_dic   =   fm_util_get_integer ('id_dic', scalar = .true.)
   id_adic  =   fm_util_get_integer ('id_adic', scalar = .true.)
@@ -1658,14 +1702,14 @@ do n = 1, instances  !{
 enddo  !} n
 
 ! Write SVN version numbers to both the logfile and the standard output
-! mac, mar12.
+! mac, mar12.  
 call write_version_number(version, tagname)
 
 if (mpp_pe() == mpp_root_pe() ) then
  print*
- print*,"SVN details of csiro_bgc compiled into executable"
- print*,"$HeadURL: https://access-svn.nci.org.au/svn/mom4/ozMOM/trunk/src/mom4p1/ocean_csiro_bgc/csiro_bgc.F90 $"
- print*,"$Id: csiro_bgc.F90 414 2013-11-07 01:00:26Z mtc599 $"
+ print*,"Repo. details of csiro_bgc compiled into executable"
+ print*,"git:/mom_mac/src/mom5csiro_bgc.F90"
+ print*,"mac, sep16."
  print*
 endif
 
@@ -1989,7 +2033,11 @@ if (pistonveloc_id .eq. 0) then  !{
        trim(pistonveloc_file))
 endif  !}
 
+#ifdef AusCOM
+if (id_adic .ne. 0 .and. .not. use_access_co2) then
+#else
 if (id_adic .ne. 0) then
+#endif
  aco2_id = init_external_field(aco2_file,                    &
                                       aco2_name,              &
                                       domain = Domain%domain2d)
@@ -2067,6 +2115,8 @@ wdetbio_id = init_external_field("INPUT/bgc_param.nc",          &
         "wdetbio", domain = Domain%domain2d)
 wcaco3_id = init_external_field("INPUT/bgc_param.nc",          &
         "wcaco3", domain = Domain%domain2d)
+nat_co2_id = init_external_field("INPUT/bgc_param.nc",          &
+        "nat_co2", domain = Domain%domain2d)
 tscav_fe_id = init_external_field("INPUT/bgc_param.nc",          &
         "tscav_fe", domain = Domain%domain2d)
 fe_bkgnd_id = init_external_field("INPUT/bgc_param.nc",          &
