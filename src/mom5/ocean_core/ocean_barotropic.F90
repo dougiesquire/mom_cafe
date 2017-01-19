@@ -1859,11 +1859,11 @@ subroutine barotropic_diag_init(Time)
 
   id_eta_t  = register_diag_field ('ocean_model', 'eta_t', Grd%tracer_axes(1:2),     &
               Time%model_time, 'surface height on T cells'//trim(model_type),'meter',&
-              missing_value=missing_value, range=(/-1e3,1e3/))
+              missing_value=missing_value, range=(/-2e1,2e1/))
 
   id_eta_t_sq = register_diag_field ('ocean_model', 'eta_t_sq', Grd%tracer_axes(1:2),        &
               Time%model_time, 'square of surface height on T cells'//trim(model_type),'m^2',&
-              missing_value=missing_value, range=(/-1e3,1e3/))
+              missing_value=missing_value, range=(/-4e1,4e1/))
 
   id_eta_t_bar    = register_diag_field ('ocean_model', 'eta_t_bar', Grd%tracer_axes(1:2), &
               Time%model_time, 'surface height on T cells averaged over bar loop', 'meter',&

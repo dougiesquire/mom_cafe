@@ -716,18 +716,18 @@ ierr = check_nml_error(io_status,'ocean_tracer_diag_nml')
     id_mld_dtheta = register_diag_field ('ocean_model', 'mld_dtheta',     &
              Grd%tracer_axes(1:2), Time%model_time,                       &
              'mixed layer depth determined by temperature criteria ', 'm',&
-             missing_value=missing_value, range=(/0.0,1.e6/))   
+             missing_value=missing_value, range=(/0.0,1.e4/))   
 
     id_mld = register_diag_field ('ocean_model', 'mld',               &
              Grd%tracer_axes(1:2), Time%model_time,                   &
              'mixed layer depth determined by density criteria ', 'm',&
-             missing_value=missing_value, range=(/0.0,1.e6/),         &
+             missing_value=missing_value, range=(/0.0,1.e4/),         &
              standard_name='ocean_mixed_layer_thickness_defined_by_sigma_t')   
 
     id_mld_sq = register_diag_field ('ocean_model', 'mld_sq',                  &
              Grd%tracer_axes(1:2), Time%model_time,                            &
              'squared mixed layer depth determined by density criteria', 'm^2',&
-             missing_value=missing_value, range=(/0.0,1.e12/),                 &
+             missing_value=missing_value, range=(/0.0,1.e8/),                 &
              standard_name='square_of_ocean_mixed_layer_thickness_defined_by_sigma_t')      
 
     id_mld_nrho = register_diag_field ('ocean_model', 'mld_nrho',      &
