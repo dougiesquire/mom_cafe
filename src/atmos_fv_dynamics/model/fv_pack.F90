@@ -166,7 +166,7 @@ module fv_pack
    integer :: icase = 6      ! Test case number if "SW_DYN" is defined
                              ! see tools/nit_sw_ic.f90 for details
 
-   character(len=24) :: restart_format = 'native'   ! native or netcdf
+   character(len=24) :: restart_format = 'netcdf'   ! native or netcdf
 
    character(len=128) :: version = '$Id: fv_pack.F90 1.1.2.15.2.2'
    character(len=128) :: tagname = '$Name: tikal $'
