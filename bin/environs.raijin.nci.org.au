@@ -5,7 +5,7 @@ module load dot
 set intel_ver = 14.3.174
 module load intel-fc/$intel_ver
 module load intel-cc/$intel_ver
-module load openmpi/1.8.3
+module load openmpi/1.10.2
 
 
    module load netcdf/4.3.2
