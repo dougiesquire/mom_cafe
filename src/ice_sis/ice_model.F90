@@ -1302,7 +1302,7 @@ contains
              end if
 
              tot_heat = heat_res_ice+heat_limit_ice
-             if (.not. slab_ice .and. (tot_heat<0.0)) then ! add like frazil
+             if (.not. slab_ice .and. (tot_heat<0.0) .and. (cell_area(i,j)>0)) then ! add like frazil
                 do k=2,km
                    if (Ice%part_size(i,j,1)+Ice%part_size(i,j,k)>0) exit
                 end do
