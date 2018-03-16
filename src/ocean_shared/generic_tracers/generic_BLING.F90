@@ -606,7 +606,7 @@ write (stdlogunit, generic_bling_nml)
   subroutine generic_BLING_init(tracer_list)
     type(g_tracer_type), pointer :: tracer_list
 
-    call write_version_number( version, tagname )
+    call write_version_number(version, tagname)
 
     !Specify and initialize all parameters used by this package
     call user_add_params
@@ -3109,7 +3109,7 @@ write (stdlogunit, generic_bling_nml)
             grid_tmask(i,j,1)
        sc_no_term = sqrt(660.0 / (sc_o2 + epsln)) 
      
-       o2_alpha(i,j) = o2_saturation       * sc_no_term * bling%Rho_0
+       o2_alpha(i,j) = o2_saturation       * sc_no_term
        o2_csurf(i,j) = o2_field(i,j,1,tau) * sc_no_term * bling%Rho_0 !nnz: MOM has rho(i,j,1,tau)
 
     enddo; enddo

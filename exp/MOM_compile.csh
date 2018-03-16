@@ -8,10 +8,10 @@ set platform      = raijin.nci.org.au   # A unique identifier for your platfo
 set type          = MOM_SIS      # Type of the experiment
 set help = 0
 set debug = 0
+set use_netcdf4 = 0
 set unit_testing = 0
 
-
-set argv = (`getopt -u -o h -l type: -l platform: -l help  --  $*`)
+set argv = (`getopt -u -o h -l type: -l platform: -l help -l unit_testing -l debug -l use_netcdf4 --  $*`)
 while ("$argv[1]" != "--")
     switch ($argv[1])
         case --type:
@@ -22,6 +22,8 @@ while ("$argv[1]" != "--")
                 set unit_testing = 1; breaksw
         case --debug:
                 set debug = 1; breaksw
+        case --use_netcdf4:
+                set use_netcdf4 = 1; breaksw
         case --help:
                 set help = 1;  breaksw
         case -h:
@@ -43,6 +45,8 @@ if ( $help ) then
     echo "             ACCESS-OM : ocean component of ACCESS-OM model."
     echo
     echo "--platform   followed by the platform name that has a corresponfing environ file in the ../bin dir, default is gfortran"
+    echo
+    echo "--use_netcdf4  use NetCDF4, the default is NetCDF4. Warning: many of the standard experiments don't work with NetCDF4."
     echo
     exit 1
 endif
@@ -70,9 +74,9 @@ endif
 if ( $type == EBM ) then
     set cppDefs  = ( "-Duse_netCDF -Duse_netCDF3 -Duse_libMPI -DLAND_BND_TRACERS -DOVERLOAD_C8 -DOVERLOAD_C4 -DOVERLOAD_R4" )
 else if( $type == ACCESS-OM ) then
-    set cppDefs  = ( "-Duse_netCDF -Duse_netCDF3 -Duse_libMPI -DACCESS" )
+    set cppDefs  = ( "-Duse_netCDF -Duse_libMPI -DACCESS" )
 else if( $type == ACCESS-CM ) then
-    set cppDefs  = ( "-Duse_netCDF -Duse_netCDF3 -Duse_libMPI -DACCESS -DACCESS_CM" )
+    set cppDefs  = ( "-Duse_netCDF -Duse_libMPI -DACCESS -DACCESS_CM" )
 endif
 
 if ( $unit_testing ) then
@@ -84,16 +88,21 @@ if ( $debug ) then
     setenv DEBUG true
 endif
 
-##
-## Users must ensure the correct environment file exists for their platform.
-##
+if ( $use_netcdf4 ) then
+    set cppDefs = `echo $cppDefs | sed -e 's/-Duse_netCDF3//g'`
+    set cppDefs = "$cppDefs -Duse_netCDF4"
+endif
+
+#
+# Users must ensure the correct environment file exists for their platform.
+#
 source $root/bin/environs.$platform  # environment variables and loadable modules
 
-##
-## compile mppnccombine.c, needed only if $npes > 1
-#  if ( ! -f $mppnccombine ) then
-#    cc -O -o $mppnccombine -I/usr/local/include -L/usr/local/lib $code_dir/postprocessing/mppnccombine/mppnccombine.c -lnetcdf
-#  endif
+#
+# compile mppnccombine.c, needed only if $npes > 1
+if ( ! -f $mppnccombine ) then
+    cc -O -o $mppnccombine -I/usr/local/include -L/usr/local/lib $code_dir/postprocessing/mppnccombine/mppnccombine.c -lm -lnetcdf
+endif
 
 set mkmf_lib = "$mkmf -f -m Makefile -a $code_dir -t $mkmfTemplate"
 set lib_include_dirs = "$root/include $code_dir/shared/include $code_dir/shared/mpp/include"
@@ -163,6 +172,7 @@ else if( $type == ACCESS-OM || $type == ACCESS-CM ) then
     set srcList = ( access_coupler )
     set includes = "-I$executable:h:h/lib_FMS -I$executable:h:h/$type/lib_ocean" 
     set libs = "$executable:h:h/$type/lib_ocean/lib_ocean.a $executable:h:h/lib_FMS/lib_FMS.a"
+    setenv OASIS true
 else if( $type == MOM_SIS ) then
     set srcList = ( coupler )
     set includes = "$includes -I$executable:h:h/lib_ice -I$executable:h:h/lib_atmos_null -I$executable:h:h/lib_land_null"
@@ -183,6 +193,9 @@ else if( $type == ICCM ) then
     set srcList = ( coupler )
     set includes = "$includes -I$executable:h:h/lib_ice -I$executable:h:h/lib_atmos_bg -I$executable:h:h/lib_atmos_phys -I$executable:h:h/lib_land_lad" 
     set libs = "$executable:h:h/lib_ocean/lib_ocean.a $executable:h:h/lib_ice/lib_ice.a $executable:h:h/lib_atmos_bg/lib_atmos_bg.a $executable:h:h/lib_atmos_phys/lib_atmos_phys.a $executable:h:h/lib_land_lad/lib_land_lad.a $executable:h:h/lib_FMS/lib_FMS.a"
+else
+    echo "Error: unsupported model type, please see model types in ./MOM_compile.sh --help"
+    exit 1
 endif
 $mkmf_exec -o "$includes" -l "$libs"  $srcList
 

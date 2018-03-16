@@ -76,6 +76,7 @@ real    :: cellarea_r
 ! for diagnostics 
 integer :: id_sw_frac       =-1
 integer :: id_sw_heat       =-1
+integer :: id_sw_heat_on_nrho=-1
 integer :: id_irradiance    =-1
 
 integer :: id_neut_rho_sw          =-1
@@ -94,7 +95,10 @@ logical :: used
 real :: cp_r
 
 ! for irradiance index
-integer :: index_irr 
+integer :: index_irr
+
+! for FAFMIP redistributed heat tracer
+integer :: index_redist_heat = -1 
 
 logical :: module_is_initialized  = .false.
 logical :: use_this_module        = .false.
@@ -114,20 +118,21 @@ contains
 ! <SUBROUTINE NAME="ocean_shortwave_init">
 !
 ! <DESCRIPTION>
-! Initialization for the shorwave module
+! Initialization for the shortwave module.
 ! </DESCRIPTION>
-  subroutine ocean_shortwave_init(Grid, Domain, Time, Dens, vert_coordinate, Ocean_options)
+  subroutine ocean_shortwave_init(Grid, Domain, Time, Dens, T_prog, vert_coordinate, Ocean_options)
 
-    type(ocean_grid_type),    intent(in), target :: Grid
-    type(ocean_domain_type),  intent(in), target :: Domain
-    type(ocean_time_type),    intent(in)         :: Time 
-    type(ocean_density_type), intent(in)         :: Dens
-    integer,                  intent(in)         :: vert_coordinate
-    type(ocean_options_type), intent(inout)      :: Ocean_options
+    type(ocean_grid_type),        intent(in), target :: Grid
+    type(ocean_domain_type),      intent(in), target :: Domain
+    type(ocean_time_type),        intent(in)         :: Time 
+    type(ocean_density_type),     intent(in)         :: Dens
+    type(ocean_prog_tracer_type), intent(in)         :: T_prog(:)
+    integer,                      intent(in)         :: vert_coordinate
+    type(ocean_options_type),     intent(inout)      :: Ocean_options
 
     integer :: unit, io_status, ierr
     integer :: num_schemes=0
-
+    integer :: n, num_prog_tracers
     integer :: stdoutunit,stdlogunit 
     stdoutunit=stdout();stdlogunit=stdlog() 
 
@@ -135,7 +140,7 @@ contains
     
     module_is_initialized = .TRUE.
 
-    call write_version_number( version, tagname )
+    call write_version_number(version, tagname)
 
 #ifdef INTERNAL_FILE_NML
     read (input_nml_file, nml=ocean_shortwave_nml, iostat=io_status)
@@ -190,7 +195,13 @@ contains
     if(num_schemes > 1) then 
       call mpp_error(FATAL,&
       '==>shortwave_mod: choose only ONE of the shortwave schemes: GFDL, CSIRO, JERLOV, or External.')
-    endif 
+    endif
+
+    ! to determine index for FAFMIP temperature tracer     
+    num_prog_tracers = size(T_prog(:))
+    do n=1,num_prog_tracers
+       if (T_prog(n)%name == 'redist_heat') index_redist_heat = n
+    enddo
 
     ! for diagnostics      
     id_sw_frac = register_diag_field ('ocean_model', 'sw_frac',                       &
@@ -247,11 +258,12 @@ end subroutine ocean_irradiance_init
 ! Choose either of the GFDL, CSIRO, JERLOV or External sw_source methods.
 !
 ! </DESCRIPTION>
-subroutine sw_source (Time, Thickness, Dens, T_diag, swflx, swflx_vis, Temp, sw_frac_zt, opacity)
+subroutine sw_source (Time, Thickness, Dens, T_prog, T_diag, swflx, swflx_vis, Temp, sw_frac_zt, opacity)
 
   type(ocean_time_type),          intent(in)    :: Time
   type(ocean_thickness_type),     intent(in)    :: Thickness
   type(ocean_density_type),       intent(in)    :: Dens
+  type(ocean_prog_tracer_type),   intent(inout) :: T_prog(:)
   type(ocean_diag_tracer_type),   intent(inout) :: T_diag(:)
   real, dimension(isd:,jsd:),     intent(in)    :: swflx
   real, dimension(isd:,jsd:),     intent(in)    :: swflx_vis
@@ -297,6 +309,21 @@ subroutine sw_source (Time, Thickness, Dens, T_diag, swflx, swflx_vis, Temp, sw_
       enddo
     enddo
   enddo
+
+
+  ! add heating rate to thickness*density weighted redistributed temperature
+  ! for the case when including the FAFMIP redistributed heat tracer.
+  if(index_redist_heat > 0) then 
+    do k=1,nk-1
+      do j=jsc,jec
+        do i=isc,iec
+          T_prog(index_redist_heat)%th_tendency(i,j,k) = T_prog(index_redist_heat)%th_tendency(i,j,k) + Temp%wrk1(i,j,k)*cp_r
+        enddo
+      enddo
+    enddo
+  endif 
+
+
 #ifndef MOM_STATIC_ARRAYS
   if(_ALLOCATED(Temp%radiation)) then
 #endif
@@ -385,7 +412,12 @@ subroutine watermass_diag_init(Time, Dens)
   integer :: stdoutunit
   stdoutunit=stdout()
   compute_watermass_diag = .false. 
-  
+
+  id_sw_heat_on_nrho = register_diag_field ('ocean_model', 'sw_heat_on_nrho',   &
+       Dens%neutralrho_axes(1:3), Time%model_time, 'penetrative shortwave heating binned to neutral density', &
+       'W/m^2', missing_value=-1e10, range=(/-1.e20,1.e20/))
+  if(id_sw_heat_on_nrho > 0) compute_watermass_diag = .true.
+
   id_neut_rho_sw = register_diag_field ('ocean_model', 'neut_rho_sw',&
     Grd%tracer_axes(1:3), Time%model_time,                           &
     'update of locally ref potrho from shortwave penetration',       &
@@ -495,6 +527,7 @@ subroutine watermass_diag(Time, Temp, Dens)
   call diagnose_3d_rho(Time, Dens, id_neut_rho_sw_on_nrho, wrk2)
   call diagnose_3d_rho(Time, Dens, id_wdian_rho_sw_on_nrho, wrk3)
   call diagnose_3d_rho(Time, Dens, id_tform_rho_sw_on_nrho, wrk4)
+  call diagnose_3d_rho(Time, Dens, id_sw_heat_on_nrho, Temp%wrk1)
 
   if(id_eta_tend_sw_pen > 0 .or. id_eta_tend_sw_pen_glob > 0) then
       eta_tend(:,:) = 0.0

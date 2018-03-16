@@ -124,7 +124,7 @@ if( $download ) then
     cd $root/data
     ./get_exp_data.py $name.input.tar.gz
     mkdir -p $workdir
-    cp $name.input.tar.gz $workdir
+    cp archives/$name.input.tar.gz $workdir
     cd $workdir
     tar zxvf $name.input.tar.gz
 endif
@@ -212,7 +212,7 @@ if ( $debug ) then
     set runCommand = "$mpirunCommand --debug $npes $executable >fms.out"
 endif
 
-echo "About to run the command $runCommand"
+echo "About to run experiment $name with model $type at `date`. The command is: $runCommand"
 
 if ( $valid_npes ) then
     echo "ERROR: This experiment is designed to run on $valid_npes pes. Please specify --npes  $valid_npes "
@@ -277,7 +277,7 @@ if ( $npes > 1 ) then
     endif
 
     # Concatenate iceberg restarts
-    if ( -f ocean_blobs.res.nc.0000 ) then
+    if ( -f icebergs.res.nc.0000 ) then
         ncrcat icebergs.res.nc.???? icebergs.res.nc
         rm icebergs.res.nc.????
     endif
@@ -307,7 +307,6 @@ if ( $npes > 1 ) then
                 if ( $status != 0 ) then
                     echo "ERROR: in execution of mppnccombine -n4 -r on restarts"
                     echo "Command was: $mppnccombine $file:r $input_files"
-                    exit 1
                 endif
             endif
         else
@@ -325,7 +324,7 @@ end
 unset echo
 
 echo end_of_run
-echo "NOTE: Natural end-of-script."
+echo "NOTE: Natural end-of-script for experiment $name with model $type at `date`"
 
 exit 0
 

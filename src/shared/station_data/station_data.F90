@@ -1,5 +1,5 @@
 module station_data_mod 
-! <CONTACT EMAIL="GFDL.Climate.Model.Info@noaa.gov">
+! <CONTACT EMAIL="Giang.Nong@gfdl.noaa.gov">
 !   Giang Nong
 ! </CONTACT>
 ! <OVERVIEW>

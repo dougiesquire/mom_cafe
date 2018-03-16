@@ -198,7 +198,7 @@ contains
     endif
 
     !--- write out version information ---------------------------------
-    call write_version_number(version,tagname)
+    call write_version_number(version, tagname)
 
   end subroutine edit_grid_init
 

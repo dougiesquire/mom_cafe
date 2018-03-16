@@ -54,7 +54,7 @@ class ModelTestSetup(object):
         return ret
 
 
-    def get_output(self, fo, fe):
+    def get_qsub_output(self, fo, fe):
 
         # The command has finished. Read output and write stdout.
         # We don't know when output has stopped so just keep trying
@@ -95,15 +95,18 @@ class ModelTestSetup(object):
 
 
     def run(self, model_type, exp, walltime='01:00:00', ncpus='32',
-            npes=None, mem='64Gb', qsub=True, valgrind=False):
+            npes=None, mem='64Gb', qsub=True, download_input_data=True,
+            valgrind=False):
         """
         ncpus is for requested cpus, npes is for how many mom uses.
         """
 
-        ret = self.download_input_data(exp)
-        if ret != 0:
-            print('Error: could not download input data.', file=sys.stderr)
-            return (ret, None, None)
+        if download_input_data:
+            ret = self.download_input_data(exp)
+            if ret != 0:
+                print('Error: could not download input data.',
+                      file=sys.stderr)
+                return (ret, None, None)
 
         os.chdir(self.exp_dir)
 
@@ -138,15 +141,24 @@ class ModelTestSetup(object):
         frun, run_file = tempfile.mkstemp(dir=self.exp_dir)
         os.write(frun, run_script)
         os.close(frun)
-        os.chmod(run_file, 0755)
+        os.chmod(run_file, 0o755)
 
         # Submit the experiment. This will block until it has finished.
+        ret = 0
+        stdout = ''
+        stderr = ''
         if qsub:
             ret = sp.call(['qsub', run_file])
+            stdout, stderr = self.get_qsub_output(fo, fe)
         else:
-            ret = sp.call([run_file])
+            try:
+                stdout = sp.check_output([run_file], stderr=sp.STDOUT)
+            except sp.CalledProcessError as e:
+                ret = e.returncode
+                stdout = e.output
 
-        stdout, stderr = self.get_output(fo, fe)
+            os.write(fo, stdout)
+            os.write(fe, stderr)
 
         # Move temporary files to experiment directory.
         shutil.move(stdout_file, os.path.join(self.work_dir, exp, 'fms.out'))
@@ -159,15 +171,20 @@ class ModelTestSetup(object):
         return (ret, stdout, stderr)
 
 
-    def build(self, model_type):
+    def build(self, model_type, unit_testing=True):
 
         os.chdir(self.exp_dir)
 
+        if unit_testing:
+            unit_testing = '--unit_testing'
+        else:
+            unit_testing =''
+
         platform = self.get_platform()
-        build_cmd = plat.build_cmd.format(type=model_type, platform=platform)
+        build_cmd = plat.build_cmd.format(type=model_type, platform=platform,
+                                            unit_testing=unit_testing)
         # Build the model.
         ret = sp.call(shlex.split(build_cmd))
 
         os.chdir(self.my_dir)
-
         return ret

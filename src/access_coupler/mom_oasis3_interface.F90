@@ -89,6 +89,7 @@ use mpp_domains_mod, only: mpp_get_compute_domain, &
                            mpp_get_data_domain, &
                            mpp_get_global_domain, &
                            mpp_global_field
+use mpp_parameter_mod, only: GLOBAL_ROOT_ONLY, XUPDATE, YUPDATE
 use ocean_types_mod, only: ice_ocean_boundary_type, &
                            ocean_public_type, &
                            ocean_domain_type
@@ -393,20 +394,23 @@ endif
   enddo
 
 !DHB
-if (mpp_pe() == mpp_root_pe() .or. parallel_coupling) then
-  il_out = 85 + mpp_pe()
-  write(chout,'(I6.6)'), il_out
-  choceout='oceout'//trim(chout)
-  open(il_out,file=choceout,form='formatted')
-  print *, 'MOM: (init_cpl), my_task opened log file: ', mpp_pe(), trim(choceout)
-endif
+#if defined(DEBUG)
+    if (mpp_pe() == mpp_root_pe() .or. parallel_coupling) then
+      il_out = 85 + mpp_pe()
+      write(chout,'(I6.6)'), il_out
+      choceout='oceout'//trim(chout)
+      open(il_out,file=choceout,form='formatted')
+    endif
+#endif
 
 
-    !write(il_out, *) "compute domain:",mpp_pe(), iisc, iiec, jjsc, jjec 
-    !write(il_out, *) "data domain:",mpp_pe(), iisd, iied, jjsd, jjed 
-    !write(il_out, *) "global domain:",mpp_pe(), isg, ieg, jsg, jeg 
-    !write(il_out, *) "global layout nx x ny:",pe_layout(1), pe_layout(2) 
-    !flush(il_out)
+#if defined(DEBUG)
+    write(il_out, *) "compute domain:",mpp_pe(), iisc, iiec, jjsc, jjec 
+    write(il_out, *) "data domain:",mpp_pe(), iisd, iied, jjsd, jjed 
+    write(il_out, *) "global domain:",mpp_pe(), isg, ieg, jsg, jeg 
+    write(il_out, *) "global layout nx x ny:",pe_layout(1), pe_layout(2) 
+    flush(il_out)
+#endif
 
   il_paral (:) = 0
   if (.not. parallel_coupling) then 
@@ -456,7 +460,7 @@ if (mpp_pe() == mpp_root_pe() .or. (parallel_coupling )) then
   !        field; here no decomposition for all ports.
   !
 
-  call prism_def_partition_proto (id_partition, il_paral, ierr)
+  call prism_def_partition_proto (id_partition, il_paral, ierr, imt_global*jmt_global)
 
   !
 
@@ -526,7 +530,9 @@ if ( (.not. before_ocean_update) .and. (.not. send_after_ocean_update) ) return
       if (currstep == 1) then
         call create_ncfile(trim(fname),ncid,imt_global,jmt_global,ll=1,ilout=il_out)
       endif
+#if defined(DEBUG)
       write(il_out,*) 'opening file at nstep = ', trim(fname), step
+#endif
       call ncheck( nf_open(trim(fname),nf_write,ncid) )
       call write_nc_1Dtime(real(step),currstep,'time',ncid)
     endif
@@ -643,7 +649,9 @@ real :: frac_vis_dir=0.5*0.43, frac_vis_dif=0.5*0.43,             &
       if (currstep == 1) then
         call create_ncfile(trim(fname),ncid,imt_global,jmt_global,ll=1,ilout=il_out)
       endif
+#if defined(DEBUG)
       write(il_out,*) 'opening file at nstep = ', trim(fname), step
+#endif
       call ncheck( nf_open(trim(fname),nf_write,ncid) )
       call write_nc_1Dtime(real(step),currstep,'time',ncid)
     endif
@@ -678,8 +686,16 @@ do jf =  1, num_fields_in
   case('lprec')
      Ice_ocean_boundary%lprec(iisc:iiec,jjsc:jjec) =  vwork(iisc:iiec,jjsc:jjec)
   case('salt_flx')
-     Ice_ocean_boundary%salt_flux(iisc:iiec,jjsc:jjec) =  vwork(iisc:iiec,jjsc:jjec)
-  case('calving') ! 
+     ! Sign conventions for Ice_ocean_boundary%salt_flux according to component model:
+     !  - For MOM, if Ice_ocean_boundary%salt_flux < 0 then there is a transfer
+     !    of salt from ice to liquid.
+     !  - For CICE, if Ice_ocean_boundary%salt_flux < 0 then there is a
+     !    transfer of salt from liquid to ice.
+     ! We change the sign on vwork to accord with the MOM sign convention when
+     ! filling Ice_ocean_boundary%salt_flux, since Ice_ocean_boundary%salt_flux is
+     ! used in MOM to fill its local salt flux array.
+     Ice_ocean_boundary%salt_flux(iisc:iiec,jjsc:jjec) =  -vwork(iisc:iiec,jjsc:jjec)
+  case('calving')
      Ice_ocean_boundary%calving(iisc:iiec,jjsc:jjec) =  vwork(iisc:iiec,jjsc:jjec)
   case('sw_vdir')
      Ice_ocean_boundary%sw_flux_vis_dir(iisc:iiec,jjsc:jjec) =  vwork(iisc:iiec,jjsc:jjec)
@@ -788,22 +804,25 @@ if ( write_restart ) then
 #endif
         end select
 
-    if (parallel_coupling) then
-      call mpp_global_field(Ocean_sfc%domain, vtmp(iisc:iiec,jjsc:jjec), gtmp)
-    else
-      call mpp_global_field(Ocean_sfc%domain, vtmp(iisc:iiec,jjsc:jjec), vwork)
-    endif
+        if (parallel_coupling) then
+          call mpp_global_field(Ocean_sfc%domain, vtmp(iisc:iiec,jjsc:jjec), &
+                                gtmp, flags=GLOBAL_ROOT_ONLY+XUPDATE+YUPDATE)
+        else
+          call mpp_global_field(Ocean_sfc%domain, vtmp(iisc:iiec,jjsc:jjec), &
+                                vwork, flags=GLOBAL_ROOT_ONLY+XUPDATE+YUPDATE)
+        end if
 
-         if (mpp_pe() == mpp_root_pe()) then
-           if (parallel_coupling) then
-             call write_nc2D(ncid, trim(fld_ice), gtmp, 2, imt_global,jmt_global, &
-                        1,ilout=il_out)
-           else
-             call write_nc2D(ncid, fld_ice, vwork, 2, imt_global,jmt_global, 1, ilout=il_out)
-           endif
-         end if
-      enddo
-   endif
+        if (mpp_pe() == mpp_root_pe()) then
+          if (parallel_coupling) then
+            call write_nc2D(ncid, trim(fld_ice), gtmp, 2, imt_global,jmt_global, &
+                            1,ilout=il_out)
+          else
+            call write_nc2D(ncid, fld_ice, vwork, 2, imt_global,jmt_global, 1, ilout=il_out)
+          end if
+        end if
+      end do
+   end if
+
    if (mpp_pe() == mpp_root_pe()) call ncheck( nf_close(ncid) )
 
 endif
