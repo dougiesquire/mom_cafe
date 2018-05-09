@@ -88,6 +88,10 @@ public  :: iceClocka,iceClockb,iceClockc
   real    :: ks             = 0.31       ! snow conductivity (W/mK)
   real    :: alb_sno        = 0.85       ! snow albedo (less if melting)
   real    :: alb_ice        = 0.5826     ! ice albedo (less if melting)
+  real    :: alb_sno_nth    = 0.0        ! snow albedo, North. mac, apr18.
+  real    :: alb_ice_nth    = 0.0        ! ice albedo, North.
+  real    :: alb_sno_sth    = 0.0        ! snow albedo, South. mac, apr18.
+  real    :: alb_ice_sth    = 0.0        ! ice albedo, South.
   real    :: pen_ice        = 0.3        ! part unreflected solar penetrates ice
   real    :: opt_dep_ice    = 0.67       ! ice optical depth
   real    :: t_range_melt   = 1.0        ! melt albedos scaled in over T range
@@ -149,7 +153,10 @@ public  :: iceClocka,iceClockb,iceClockc
 
 
   namelist /ice_model_nml/ mom_rough_ice, heat_rough_ice, p0, c0, cdw, wd_turn,  &
-                           kmelt, alb_sno, alb_ice, pen_ice, opt_dep_ice,        &
+                           kmelt,                                                &
+                           alb_sno, alb_ice,                                     &
+                           alb_sno_nth, alb_ice_nth, alb_sno_sth, alb_ice_sth,   &
+                           pen_ice, opt_dep_ice,                                 &
                            nsteps_dyn, nsteps_adv, num_part, atmos_winds,        &
                            slab_ice, spec_ice, ice_bulk_salin, layout,           &
                            do_ice_restore, do_ice_limit, max_ice_limit,          &
@@ -405,8 +412,26 @@ public  :: iceClocka,iceClockb,iceClockc
     end if
     call set_domain(domain)
 
+
+
     call ice_dyn_param(p0, c0, cdw, wd_turn, slab_ice)
-    call ice_thm_param(alb_sno, alb_ice, pen_ice, opt_dep_ice, slab_ice, &
+
+    ! check and set up ice albedo values for north and south hemispheres.  mac, apr18.
+    if (alb_sno_nth > 0.0 .or. alb_ice_nth > 0.0 .or. alb_sno_sth > 0.0 .or. alb_ice_sth > 0.0) then
+       if (alb_sno > 0.0 .or. alb_ice > 0.0) &
+         call error_mesg ('ice_model_init', 'Use global albedo values, or north/south values, not both.', FATAL)
+       if (alb_sno_nth <= 0.0 .or. alb_ice_nth <= 0.0 .or. alb_sno_sth <= 0.0 .or. alb_ice_sth <= 0.0) &
+         call error_mesg ('ice_model_init', 'To use north/south albedo values, all must be +ve (and < 1.0).', FATAL)
+    else
+       ! case that global alb_sno and alb_ice values are used, i.e. default case
+       alb_sno_nth=alb_sno
+       alb_sno_sth=alb_sno
+       alb_ice_nth=alb_ice
+       alb_ice_sth=alb_ice
+    endif
+
+    call ice_thm_param(alb_sno_nth, alb_ice_nth, alb_sno_sth, alb_ice_sth, &
+                       pen_ice, opt_dep_ice, slab_ice, &
                        t_range_melt, cm2_bugs, ks, h_lo_lim)
 
     allocate ( Ice % mask     (isc:iec, jsc:jec)       , &

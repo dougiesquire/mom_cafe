@@ -53,8 +53,10 @@ real, parameter :: CW    = 4.2e3     ! heat capacity of seawater
 real, parameter :: DW    = 1030.0    ! density of water for waterline - kg/(m^3)
 
 ! albedos are from CSIM4 assumming 0.53 visible and 0.47 near-ir insolation
-real            :: ALB_SNO = 0.85       ! albedo of snow (not melting)
-real            :: ALB_ICE = 0.5826     ! albedo of ice (not melting)
+real            :: ALB_SNO_NTH = 0.85       ! albedo of snow (not melting)
+real            :: ALB_ICE_NTH = 0.5826     ! albedo of ice (not melting)
+real            :: ALB_SNO_STH = 0.85       ! albedo of snow (not melting)
+real            :: ALB_ICE_STH = 0.5826     ! albedo of ice (not melting)
 real            :: PEN_ICE = 0.3        ! ice surface penetrating solar fraction
 real            :: OPT_DEP_ICE = 0.67   ! ice optical depth (m)
 real            :: T_RANGE_MELT = 1.0   ! melt albedos scaled in below melting T
@@ -78,18 +80,21 @@ contains
 !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!
 ! ice_thm_param - set ice thermodynamic parameters                             !
 !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!
-subroutine ice_thm_param(alb_sno_in, alb_ice_in, pen_ice_in, opt_dep_ice_in, &
+subroutine ice_thm_param(alb_sno_nth_in, alb_ice_nth_in, alb_sno_sth_in, alb_ice_sth_in,   &
+                         pen_ice_in, opt_dep_ice_in,                       &
                          slab_ice_in, t_range_melt_in, cm2_bugs_in, ks_in, &
                          h_lo_lim_in                                          )
-    real, intent(in)      :: alb_sno_in, alb_ice_in, pen_ice_in 
-    real, intent(in)      :: opt_dep_ice_in, t_range_melt_in
-logical, intent(in)   :: slab_ice_in
-logical, intent(in)   :: cm2_bugs_in
+    real, intent(in)      :: alb_sno_nth_in, alb_ice_nth_in, alb_sno_sth_in, alb_ice_sth_in
+    real, intent(in)      :: pen_ice_in, opt_dep_ice_in, t_range_melt_in
+    logical, intent(in)   :: slab_ice_in
+    logical, intent(in)   :: cm2_bugs_in
     real, intent(in)   :: ks_in
     real, intent(in)   :: h_lo_lim_in
 
-  ALB_SNO     = alb_sno_in
-  ALB_ICE     = alb_ice_in
+  ALB_SNO_NTH = alb_sno_nth_in
+  ALB_ICE_NTH = alb_ice_nth_in
+  ALB_SNO_STH = alb_sno_sth_in
+  ALB_ICE_STH = alb_ice_sth_in
   PEN_ICE     = pen_ice_in
   OPT_DEP_ICE = opt_dep_ice_in
   SLAB_ICE    = slab_ice_in
@@ -104,7 +109,7 @@ end subroutine ice_thm_param
 !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!
 ! ice_optics - set albedo, penetrating solar, and ice/snow transmissivity      !
 !~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!
-subroutine ice_optics(alb, pen, trn, hs, hi, ts, tfw)
+subroutine ice_optics(alb, pen, trn, hs, hi, ts, tfw, lat)
 real, intent(  out) :: alb ! ice surface albedo (0-1)
 real, intent(  out) :: pen ! fraction of down solar penetrating the ice
 real, intent(  out) :: trn ! ratio of down solar at bottom to top of ice
@@ -112,6 +117,7 @@ real, intent(in   ) :: hs  ! snow thickness (m-snow)
 real, intent(in   ) :: hi  ! ice thickness (m-ice)
 real, intent(in   ) :: ts  ! surface temperature
 real, intent(in   ) :: tfw ! seawater freezing temperature
+real, intent(in   ) :: lat ! geographic latitude (deg). mac, apr18.  
 real :: as, ai, cs
 real :: thick_ice_alb, tcrit, fh
 
@@ -152,8 +158,13 @@ real :: thick_ice_alb, tcrit, fh
 
 !! 2007/04/11 Fix for thin ice negative ice albedos from Mike Winton
 !!            Move ai calculation after if test
-
-  as = ALB_SNO; ai = ALB_ICE
+  
+! Make albedo a function of hemisphere. mac, apr18.
+  if (lat > 0.0) then
+    as = ALB_SNO_NTH; ai = ALB_ICE_NTH
+  else
+    as = ALB_SNO_STH; ai = ALB_ICE_STH
+  endif
   cs = hs/(hs+0.02)                        ! thin snow partially covers ice
 
   fh = min(atan(5.0*hi)/atan(5.0*0.5),1.0) ! use this form from CSIM4 to

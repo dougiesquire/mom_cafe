@@ -638,7 +638,8 @@ contains
              if (Ice%ice_mask(i,j,k)) then
                 call ice_optics(Ice%albedo(i,j,k), Ice%pen(i,j,k), Ice%trn(i,j,k), &
                      Ice%h_snow(i,j,k), Ice%h_ice(i,j,k), &
-                     Ice%t_surf(i,j,k)-Tfreeze, -MU_TS*Ice%s_surf(i,j) )
+                     Ice%t_surf(i,j,k)-Tfreeze, -MU_TS*Ice%s_surf(i,j), &
+                     geo_lat(i,j) )
              end if
           end do
        end do
