@@ -1,13 +1,37 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!                                                                   !!
+!!                   GNU General Public License                      !!
+!!                                                                   !!
+!! This file is part of the Flexible Modeling System (FMS).          !!
+!!                                                                   !!
+!! FMS is free software; you can redistribute it and/or modify       !!
+!! it and are expected to follow the terms of the GNU General Public !!
+!! License as published by the Free Software Foundation.             !!
+!!                                                                   !!
+!! FMS is distributed in the hope that it will be useful,            !!
+!! but WITHOUT ANY WARRANTY; without even the implied warranty of    !!
+!! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the     !!
+!! GNU General Public License for more details.                      !!
+!!                                                                   !!
+!! You should have received a copy of the GNU General Public License !!
+!! along with FMS; if not, write to:                                 !!
+!!          Free Software Foundation, Inc.                           !!
+!!          59 Temple Place, Suite 330                               !!
+!!          Boston, MA  02111-1307  USA                              !!
+!! or see:                                                           !!
+!!          http://www.gnu.org/licenses/gpl.txt                      !!
+!!                                                                   !!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 module fv_diagnostics
 
-! Programmer: sjl, Oct 30, 2003
+! Programmer: sjl@gfdl.noaa.gov, Oct 30, 2003
 
  use diag_manager_mod, only: diag_axis_init, register_diag_field, &
                              register_static_field, send_data
  use constants_mod,    only: GRAV, cp_air, rdgas, kappa, WTMAIR, WTMCO2
  use time_manager_mod, only: time_type, get_date, get_time
  use fms_mod,          only: error_mesg, FATAL, stdlog, write_version_number
- use mpp_domains_mod,  only: mpp_define_domains,  mpp_domains_init, domain2D
+ use mpp_domains_mod,  only: mpp_define_domains, mpp_domains_init, domain2D
 
 ! use fv_pack,          only: nlon, mlat, nlev, beglat, endlat, u, v, pt, delp, q,    &
 !                             omga, peln, pe, ua, va, phis, ptop, ak, bk, ks, ncnst,  &
@@ -34,10 +58,10 @@ module fv_diagnostics
 
  implicit none
 
- integer, save ::  id_ps,   id_ua,   id_va,   id_wa,  id_ta,   id_pt,   &
+ integer, save ::  id_ps,   id_ua,   id_va,  id_u, id_v,  id_wa,  id_ta,   id_pt,   &
                    id_divg, id_vort, id_hght, id_pv,  id_usus, id_tsts, &
                    id_vsts, id_usvs, id_h500, id_slp, id_p5km, id_aoa,  &
-                   id_dnflux, id_upflux, id_area
+                   id_dnflux, id_upflux, id_area, id_dp
  integer, allocatable :: id_tracer(:), id_tracer_tend(:)
 ! 2008/04/09  jgj: add tracer dry mass and volume mixing ratios
  integer, allocatable :: id_tracer_dmmr(:)
@@ -53,7 +77,7 @@ module fv_diagnostics
 
  !-----------------------------------------------------------------------
   character(len=128) :: version = '$Id: fv_diagnostics.F90,v 17.0 2009/07/21 02:53:23 fms Exp $'
-  character(len=128) :: tagname = '$Name: tikal $'
+  character(len=128) :: tagname = '$Name: mom4p1_pubrel_dec2009_nnz $'
 
 contains
 
@@ -126,7 +150,7 @@ contains
     axes(2) = id_lat
     axes(3) = id_pfull
     axes(4) = id_phalf
-
+    
 !---- register static fields -------
 
     id_bk    = register_static_field ( mod_name, 'bk', (/id_phalf/), &
@@ -173,6 +197,8 @@ contains
          'meridional wind', 'm/sec', missing_value=missing_value, range=vrange)
     id_wa = register_diag_field ( mod_name, 'omega', axes(1:3), Time,        &
          'omega', 'pa/sec', missing_value=missing_value )
+    id_dp = register_diag_field ( mod_name, 'delp', axes(1:3), Time,        &
+         'delp field', 'pa', missing_value=missing_value )
     id_dnflux = register_diag_field (mod_name, 'dnflux', axes(1:3), Time, &
          'downward mass flux', 'pa/sec', missing_value=missing_value )
     id_upflux = register_diag_field (mod_name, 'upflux', axes(1:3), Time, &
@@ -355,6 +381,20 @@ contains
     id_vsts = register_diag_field ( mod_name, 'vsts', axes(1:3), Time, &
          'eddy heat transport', '(m/sec)*K', missing_value=missing_value )
 
+! u and v on d-grid for enkf
+!    axes(1) = id_lon
+!    axes(2) = id_latb
+
+!    id_u = register_diag_field ( mod_name, 'u', axes(1:3) , Time,        &
+!         'u wind', 'm/sec', missing_value=missing_value, range=vrange )
+
+!    axes(1) = id_lonb
+!    axes(2) = id_lat
+
+!    id_v = register_diag_field ( mod_name, 'v', axes(1:3), Time,        &
+!         'v wind', 'm/sec', missing_value=missing_value, range=vrange )
+
+
     ! make sure all send_data completed before one thread exits the routine
     call fv_array_sync()
 
@@ -367,6 +407,7 @@ contains
  subroutine fv_diag( Time, im, jm, km, jfirst, jlast, nq, zvir, dt_atmos, hs_phys)
 
    use pv_module,   only: vort_d, pv_entropy
+   use mpp_domains_mod,  only: mpp_get_data_domain
 #include "fv_arrays.h"
 !INPUT PARAMETERS:
       type(time_type), intent(in) :: Time
@@ -390,6 +431,7 @@ contains
       real ztop
       integer  i, j, k, ic
       integer  yr, mon, dd, hr, mn, days, seconds
+      integer :: ids, ide, jds, jde
       logical::  prt_minmax
       real p0
 ! Local:
@@ -400,7 +442,7 @@ contains
 !      real, allocatable:: vs(:,:,:)
 !      real, allocatable:: wz(:,:,:)
       real :: xx(im,jfirst:jlast,km)
-      real :: us(im,jfirst:jlast,km)
+     real :: us(im,jfirst:jlast,km)
       real :: vs(im,jfirst:jlast,km)
       real :: wz(im,jfirst:jlast,km+1)
 
@@ -482,7 +524,7 @@ contains
 
     if (id_ps > 0) used = send_data ( id_ps, ps(beglon:endlon,beglat:endlat), Time )
 
-    if ( id_ua > 0 .or. id_va > 0 ) then
+   if ( id_ua > 0 .or. id_va > 0 ) then
 
          if (id_ua > 0) used = send_data ( id_ua, ua(beglon:endlon,beglat:endlat,:), Time )
          if (id_va > 0) used = send_data ( id_va, va(beglon:endlon,beglat:endlat,:), Time )
@@ -491,6 +533,7 @@ contains
 
 ! Send vertical velocity (pa/s)
     if (id_wa > 0)  used = send_data ( id_wa, omga(beglon:endlon,beglat:endlat,:), Time )
+    if (id_dp > 0)  used = send_data ( id_dp, delp(beglon:endlon,beglat:endlat,:), Time )
     ! The following sync call is required to ensure that send_data completes before 
     ! array omga is touched by another thread. 
     if( id_vort>0 .or. id_pv>0 .or. id_ta>0 .or. id_pt>0 ) call fv_array_sync()
