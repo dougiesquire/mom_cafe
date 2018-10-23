@@ -162,7 +162,8 @@ integer :: secs_restore
 integer :: initial_day
 integer :: initial_secs
 real,allocatable :: sdiffo(:)
-logical :: restore_cars_deep = .false.
+logical :: restore_cars_deep = .false.      ! turn on deep restoring to 'cars' field
+integer :: cars_deep_nlevels = 0            ! number of levels, from bottom of grid, to restore to 'cars' field
 logical :: limit_temp = .false.
 logical :: limit_salt = .false.
 real    :: limit_temp_max      = 40.0
@@ -179,7 +180,7 @@ real    :: limit_salt_min      = 0.1
 namelist /ocean_sponges_tracer_nml/ use_this_module, damp_coeff_3d
 namelist /ocean_sponges_tracer_OFAM_nml/ use_adaptive_restore,use_sponge_after_init, use_normalising, use_hard_thump, use_increment, &
                                       athresh, taumin,lambda,npower,days_to_restore, secs_to_restore, &
-                                      restore_cars_deep, limit_temp, limit_salt, &
+                                      restore_cars_deep, cars_deep_nlevels, limit_temp, limit_salt, &
                                       limit_temp_max, limit_temp_min, limit_salt_max, limit_salt_min
 
 contains
@@ -522,7 +523,7 @@ subroutine sponge_tracer_source(Time, Thickness, T_prog)
      endif
 
         if ( restore_cars_deep .and. Cars(n)%id == 1 ) then
-           do k=nk-4,nk
+           do k=nk-cars_deep_nlevels,nk
               do j=jsd,jed
                  do i=isd,ied  
                     wrk2(i,j,k) = Thickness%rho_dzt(i,j,k,tau)*one_over_year    &
