@@ -40,10 +40,12 @@ integer :: index_temp, index_salt
 
       integer :: ts_npzd ! number of time steps within NPZD model
       integer :: kmeuph = 20 ! deepest level of  euphotic zone
+      integer :: k100 = 10 ! deepest level less than 100 m
       integer :: tn, trn
 
+
       real :: pi    = 3.14159265358979  !yes, this is pi
-      real :: biotr(isc:iec,grid%nk,ntr_bmax), bioma(isc:iec,grid%nk,ntr_bmax), pprod(isc:iec,jsc:jec,grid%nk)
+      real :: biotr(isc:iec,grid%nk,ntr_bmax), bioma(isc:iec,grid%nk,ntr_bmax)
       real :: bion,biop,bioz,biod,bioo,biocaco3,bioi
       real :: u_npz,g_npz
       real :: fx1,fx2,fx3,fx4,fu1,fu2,radbio, sw_zt, sw_zt1, sw_zt2
@@ -96,8 +98,10 @@ integer :: index_temp, index_salt
 ! set the maximum index for euphotic depth
       do k=1,grid%nk
          if (grid%zw(k).le. 400) kmeuph=k
+         if (grid%zw(k).le. 100) k100=k
       enddo
 !        print*,'rjm euphotic ', kmeuph
+!        print*,'mac k100 ', k100
 
 !
 !
@@ -141,6 +145,8 @@ do n = 1, instances  !{
   pprod_gross(:,:,:) = 0.0
   zprod_gross(:,:,:) = 0.0
   light_limit(:,:) = 0.0
+  export_prod(:,:) = 0.0
+  export_inorg(:,:) = 0.0
 
 ! possible tracers in model
   ind_dic = biotic(n)%ind_bgc(id_dic)
@@ -354,6 +360,14 @@ do n = 1, instances  !{
          enddo  !} i
         enddo  !} k
        enddo  !} tn 
+
+
+! Calculate export production, organic and inorganic.  mac, sep18.
+        k=k100
+        do i = isc, iec  !{
+         export_prod(i,j)=t_prog(ind_det)%field(i,j,k,time%taum1)*wdetbio(i,j)*grid%tmask(i,j,k)
+         export_inorg(i,j)=t_prog(ind_caco3)%field(i,j,k,time%taum1)*wcaco3(i,j)*grid%tmask(i,j,k)
+        enddo  !} i
 
 
 !chd  add biotically induced tendency to biotracers,

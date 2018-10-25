@@ -244,6 +244,8 @@ integer                                 :: id_light_limit = -1
 integer                                 :: id_pprod_gross = -1
 integer                                 :: id_pprod_gross_2d = -1
 integer                                 :: id_zprod_gross = -1
+integer                                 :: id_export_prod = -1
+integer                                 :: id_export_inorg = -1
 integer                                 :: id_kw_o2  = -1
 integer                                 :: id_o2_sat = -1
 integer                                 :: id_sc_o2  = -1
@@ -307,7 +309,7 @@ real, allocatable, dimension(:) :: fmin_pic
 real, allocatable, dimension(:,:,:) :: biotr
 real, allocatable, dimension(:,:) :: light_limit
 real, allocatable, dimension(:,:,:) :: pprod_gross
-real, allocatable, dimension(:,:) :: pprod_gross_2d
+real, allocatable, dimension(:,:) :: pprod_gross_2d, export_prod, export_inorg
 real, allocatable, dimension(:,:,:) :: zprod_gross
 real, allocatable, dimension(:) :: ray
 real, allocatable, dimension(:) :: dummy
@@ -457,6 +459,8 @@ allocate( light_limit(isc:iec,jsc:jec) )
 allocate( pprod_gross(isc:iec,jsc:jec,nk) )
 allocate( pprod_gross_2d(isc:iec,jsc:jec) )
 allocate( zprod_gross(isc:iec,jsc:jec,nk) )
+allocate( export_prod(isc:iec,jsc:jec) )
+allocate( export_inorg(isc:iec,jsc:jec) )
 
 allocate (tmp(isd:ied,jsd:jed) )
 allocate ( tracer_sources(0:nk) )
@@ -1874,6 +1878,16 @@ if (id_pprod_gross_2d .gt. 0) then
        time%model_time, rmask = grid%tmask(isc:iec,jsc:jec,1))
 endif
 
+if (id_export_prod .gt. 0) then
+  used = send_data(id_export_prod, export_prod(isc:iec,jsc:jec),          &
+       time%model_time, rmask = grid%tmask(isc:iec,jsc:jec,1))
+endif
+
+if (id_export_inorg .gt. 0) then
+  used = send_data(id_export_inorg, export_inorg(isc:iec,jsc:jec),          &
+       time%model_time, rmask = grid%tmask(isc:iec,jsc:jec,1))
+endif
+
 ! Gross production of zooplankton
 
 if (id_zprod_gross .gt. 0) then
@@ -2218,6 +2232,14 @@ id_pprod_gross_2d = register_diag_field('ocean_model','pprod_gross_2d', &
 id_zprod_gross = register_diag_field('ocean_model','zprod_gross', &
      grid%tracer_axes(1:3),Time%model_time, 'Gross ZOO production', &
      'mmolN/m^3/s',missing_value = -1.0e+10)
+
+id_export_prod = register_diag_field('ocean_model','export_prod', &
+     grid%tracer_axes(1:2),Time%model_time, 'Organic export through 100m', &
+     'mmolN/m^2/s',missing_value = -1.0e+10)
+
+id_export_inorg = register_diag_field('ocean_model','export_inorg', &
+     grid%tracer_axes(1:2),Time%model_time, 'Inorganic export through 100m', &
+     'mmolC/m^2/s',missing_value = -1.0e+10)
 
 id_caco3_sediment = register_diag_field('ocean_model','caco3_sediment', &
      grid%tracer_axes(1:2),Time%model_time, 'Accumulated CaCO3 in sediment at base of water column', &
