@@ -1,0 +1,9 @@
+# Env. for Magnus
+
+echo $MODULE_VERSION
+source /opt/cray/pe/modules/default/init/csh
+
+module swap PrgEnv-cray PrgEnv-intel
+module load cray-netcdf
+setenv mpiruncommand   "srun -n"
+setenv CRAYPE_LINK_TYPE dynamic
