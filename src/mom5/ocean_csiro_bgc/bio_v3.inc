@@ -152,7 +152,7 @@ do n = 1, instances  !{
   ind_dic = biotic(n)%ind_bgc(id_dic)
   ind_adic = biotic(n)%ind_bgc(id_adic)
   ind_alk = biotic(n)%ind_bgc(id_alk)
-  ind_po4 = biotic(n)%ind_bgc(id_po4)
+ ! ind_po4 = biotic(n)%ind_bgc(id_po4)
   ind_o2  = biotic(n)%ind_bgc(id_o2)
 
   ind_no3  = biotic(n)%ind_bgc(id_no3)

@@ -43,7 +43,7 @@ public :: ice_data_type, ice_model_init, ice_model_end, ice_stock_pe, kmelt,  &
           chan_cfl_limit, ice_data_type_chksum
 public :: do_sun_angle_for_alb
 
-public  :: id_cn, id_hi, id_hs, id_t1, id_t2, id_ts
+public  :: id_cn, id_hi, id_hs, id_t1, id_t2, id_ts, id_hi2, id_hs2
 public  :: id_mi, id_sh, id_lh, id_sw, id_lw, id_snofl, id_rain, id_runoff,    &
            id_calving, id_runoff_hflx, id_calving_hflx,                        &
            id_evap, id_saltf, id_tmelt, id_bmelt, id_bheat, id_e2m,            &
@@ -66,7 +66,7 @@ public  :: iceClocka,iceClockb,iceClockc
 
   !---- id for diagnositics -------------------
   integer :: id_xb, id_xt, id_yb, id_yt, id_ct, id_xv, id_yv
-  integer :: id_cn, id_hi, id_hs, id_t1, id_t2, id_ts
+  integer :: id_cn, id_hi, id_hs, id_t1, id_t2, id_ts, id_hi2, id_hs2
   integer :: id_mi, id_sh, id_lh, id_sw, id_lw, id_snofl, id_rain
   integer :: id_runoff, id_calving, id_runoff_hflx, id_calving_hflx
   integer :: id_evap, id_saltf, id_tmelt, id_bmelt, id_bheat, id_e2m
@@ -894,6 +894,7 @@ public  :: iceClocka,iceClockb,iceClockc
        id_ext = register_diag_field('ice_model', 'EXT', axt, Ice%Time, &
                 'ice modeled', '0 or 1', missing_value=missing)
     end if
+    !psandery 20200607 id_hs id_hi -> 2d -> 3d
     id_aice     = register_diag_field('ice_model', 'aice', axt, Ice%Time,   &
                    'ice cover', 'm^2/m^2', missing_value=missing)
     id_wnd      = register_diag_field('ice_model', 'wnd ', axt, Ice%Time,   &
@@ -904,9 +905,9 @@ public  :: iceClocka,iceClockb,iceClockc
                  'ice + bergs mass', 'kg/m^2', missing_value=missing)
     id_cn       = register_diag_field('ice_model', 'CN', axt2, Ice%Time,                 &
                  'ice concentration', '0-1', missing_value=missing)
-    id_hs       = register_diag_field('ice_model', 'HS', axt, Ice%Time,                  &
+    id_hs       = register_diag_field('ice_model', 'HS', axt , Ice%Time,                  &
                  'snow thickness', 'm-snow', missing_value=missing)
-    id_hi       = register_diag_field('ice_model', 'HI', axt, Ice%Time,                  &
+    id_hi       = register_diag_field('ice_model', 'HI', axt , Ice%Time,                  &
                  'ice thickness', 'm-ice', missing_value=missing)
     id_t1       = register_diag_field('ice_model', 'T1', axt, Ice%Time,                  &
                  'upper ice layer temperature', 'C',  missing_value=missing)

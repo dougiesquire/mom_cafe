@@ -246,7 +246,8 @@ contains
 
        do j = jsc, jec
           do i = isc, iec
-             if( (wett(i,j)>0.5) .and.(ci(i,j)*(DI*hi(i,j)+DS*hs(i,j))>MIV_MIN) ) then
+             !if( (wett(i,j)>0.5) .and.(ci(i,j)*(DI*hi(i,j)+DS*hs(i,j))>MIV_MIN) .and. (edt(i,j)>0) .and. (strn11(i,j)>0) .and. (strn22(i,j)>0) ) then
+             if( (wett(i,j)>0.5) .and.(ci(i,j)*(DI*hi(i,j)+DS*hs(i,j))>MIV_MIN) .and. (edt(i,j)>0) ) then
                 f11(i,j)   = mp4z(i,j)+sig11(i,j)/edt(i,j)+strn11(i,j)
                 f22(i,j)   = mp4z(i,j)+sig22(i,j)/edt(i,j)+strn22(i,j)
                 sig11(i,j) = (t1(i,j)*f22(i,j)+f11(i,j))/t2(i,j)

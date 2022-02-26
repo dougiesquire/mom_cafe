@@ -3,9 +3,9 @@
 
 
 set echo
-set platform      = raijin.nci.org.au   # A unique identifier for your platfo
+set platform      = gadi.nci.org.au   # A unique identifier for your platfo
                                   # This corresponds to the mkmf templates in $root/bin dir.
-set type          = CM2M      # Type of the experiment
+set type          =  CM2M     # Type of the experiment
 set help = 0
 set debug = 0
 set unit_testing = 0
@@ -187,7 +187,7 @@ endif
 $mkmf_exec -o "$includes" -l "$libs"  $srcList
 
 
-make
+make -j 24
 if( $status ) then
     echo "Make failed to create the $type executable"
     exit 1

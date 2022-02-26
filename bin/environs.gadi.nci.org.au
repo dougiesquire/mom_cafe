@@ -1,0 +1,12 @@
+  echo $MODULE_VERSION
+   source /opt/Modules/v4.3.0/init/csh
+   module purge
+   module load dot
+
+   module load intel-compiler/2019.3.199
+#   module load netcdf/4.7.1
+#   module load openmpi/4.0.1
+     module load netcdf/4.6.3
+     module load openmpi/4.0.1
+   setenv mpirunCommand   "mpirun --mca orte_base_help_aggregate 0 -np"
+   setenv OMPI_CC icc

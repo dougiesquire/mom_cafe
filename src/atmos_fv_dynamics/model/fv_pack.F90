@@ -1338,8 +1338,8 @@ integer, intent(in):: seconds
 #ifdef USE_LIMA
       real drym
 
-!     parameter ( drym = 98222. )       ! setting for US NAVY 10 min data
-      parameter ( drym = 98288. )       ! setting for USGS
+     parameter ( drym = 98222. )       ! setting for US NAVY 10 min data
+!      parameter ( drym = 98288. )       ! setting for USGS
 !     parameter ( drym = 98290. )       ! New setting for USGS
 #endif
 

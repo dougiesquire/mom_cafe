@@ -8,7 +8,7 @@ set platform      = raijin.nci.org.au   # A unique identifier for your platfo
 set type          = MOM_SIS      # Type of the experiment
 set help = 0
 set debug = 0
-set use_netcdf4 = 0
+set use_netcdf4 = 1
 set unit_testing = 0
 
 set argv = (`getopt -u -o h -l type: -l platform: -l help -l unit_testing -l debug -l use_netcdf4 --  $*`)

@@ -8,7 +8,7 @@
 #NETCDFPATH = /usr/local/netcdf-4.0.1
 SOURCES = mppnccombine.c
 OBJECTS = mppnccombine.o
-CC = icc
+CC = mpicc
 CFLAGS =
 #LFLAGS = -L${NETCDFPATH}/lib/shared
 LIBS = -lnetcdf -lhdf5_hl -lhdf5 -lmpi -lz
